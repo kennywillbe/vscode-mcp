@@ -317,11 +317,12 @@ nor requires Windows runtime support.
   `22.13.0`, pnpm `10.24.0`, a SHA-256-verified pnpm bootstrap, frozen installation,
   audit, all 36 files/356 tests, production builds, and exact-artifact host runs on both
   supported VS Code bounds. Neither local execution is a GitHub-hosted runner record.
-- `CI` configures supported-platform validation and extension-host matrices on Linux and
-  macOS, including VS Code `1.101.0` and stable. Release packaging depends on both
-  matrices and performs a reproducibility comparison.
-- This unpublished local repository has no hosted GitHub Actions run to cite because
-  repository creation is intentionally deferred to the separate publication stage.
+- `CI` configures supported-platform validation and extension-host compatibility axes:
+  Linux runs VS Code `1.101.0` and stable, while macOS Intel runs stable. Local Apple
+  Silicon evidence covers both versions. Release packaging depends on all matrix jobs
+  and performs a reproducibility comparison.
+- The private GitHub repository runs the hosted matrix before the separate public,
+  release, and Marketplace publication approvals.
 - No real Snap or Flatpak compatibility run exists, consistent with those distributions
   remaining explicitly deferred.
 

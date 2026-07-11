@@ -99,13 +99,15 @@ envelope ceiling.
 - Authenticated `closeSession` tests run six sequential bridge-style sessions and prove
   the acknowledgement and peer close complete before the next session consumes an
   admission slot.
-- The thirteen-test extension-host suite starts the bundled bridge, invokes all 39
-  tools, and passed on macOS with stable VS Code `1.128.0` and the minimum supported
-  `1.101.0` after the provider/scheduler hardening.
+- The thirteen-test extension-host suite starts the bundled bridge and invokes all 39
+  tools. CI covers the minimum VS Code `1.101.0` API axis on Linux and the macOS
+  platform axis on stable VS Code; local Apple Silicon evidence additionally passes both
+  versions.
 - The same thirteen scenarios passed from an installed VSIX and separately extracted
-  server archive on both macOS and clean Linux `amd64`, at VS Code `1.101.0` and stable.
-  That artifact snapshot predates later source and documentation changes; it is
-  performance evidence, not the final candidate acceptance result.
+  server archive on clean Linux `amd64` at VS Code `1.101.0` and stable, and on macOS
+  Intel at stable. Local Apple Silicon runs cover both `1.101.0` and stable. That
+  artifact snapshot predates later source and documentation changes; it is performance
+  evidence, not the final candidate acceptance result.
 - Deterministic scheduler/service regressions cancel, disconnect, and time out repeated
   waves while the original host promises remain pending. They prove no ninth execution
   starts, client outcomes remain single, delayed completion after an absolute deadline

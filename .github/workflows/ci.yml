@@ -70,6 +70,9 @@ jobs:
         vscode:
           - 1.101.0
           - stable
+        exclude:
+          - os: macos-15-intel
+            vscode: 1.101.0
 
     steps:
       - name: Check out repository
@@ -125,6 +128,9 @@ jobs:
         vscode:
           - 1.101.0
           - stable
+        exclude:
+          - os: macos-15-intel
+            vscode: 1.101.0
 
     steps:
       - name: Check out repository

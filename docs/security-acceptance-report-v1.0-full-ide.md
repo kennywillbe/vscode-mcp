@@ -57,9 +57,8 @@ is outside the 1.0 matrix and is covered by `docs/windows-support-plan.md`.
 The exact current pair is tested on macOS arm64 and in a clean Linux container using
 Node.js 22.13.0, pnpm 10.24.0 verified against the official release asset SHA-256, and
 VS Code stable under Xvfb. The pinned CI matrix repeats source and installed-pair tests
-on `ubuntu-latest` and `macos-latest` at both VS Code `1.101.0` and stable after the
-repository is created. A local macOS minimum-version run provides the pre-publication
-lower-bound check; hosted CI is not falsely claimed before a GitHub repository exists.
+on Linux at VS Code `1.101.0` and stable, plus macOS Intel at stable. Local Apple
+Silicon runs cover both versions, including the macOS minimum-version lower bound.
 
 Release-verifier negative tests reproduce and reject trailing/leading archive-name
 aliases, local-versus-central ZIP name disagreement, comment-masked VSIX identity,

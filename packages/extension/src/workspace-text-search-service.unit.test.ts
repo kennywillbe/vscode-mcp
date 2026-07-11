@@ -288,10 +288,11 @@ describe('WorkspaceTextSearchService', () => {
     );
     const cursor = first.result.nextCursor;
     expect(cursor).not.toBeNull();
+    const tamperedCursor = `${cursor?.slice(0, -1)}${cursor?.endsWith('A') === true ? 'B' : 'A'}`;
     const calls = host.findCalls;
 
     for (const [query, value] of [
-      ['needle', `${cursor?.slice(0, -1)}x`],
+      ['needle', tamperedCursor],
       ['other', cursor],
     ] as const) {
       await expect(

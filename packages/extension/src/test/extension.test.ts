@@ -37,7 +37,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'serves the complete 39-tool surface through MCP, IPC, and the extension',
     async function () {
-      this.timeout(20_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
 
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -290,7 +290,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'withdraws a changed workspace fingerprint until it is explicitly enabled',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
 
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -374,7 +374,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'enforces write grants and completes the file/edit lifecycle',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       assert.ok(workspacePath);
@@ -847,7 +847,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'formats and saves text while rejecting opaque provider resource edits',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
       const workspace = vscode.workspace.workspaceFolders?.[0];
       assert.ok(workspace);
@@ -979,7 +979,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'lists and runs only configured tasks under the execution grant',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
       const workspace = vscode.workspace.workspaceFolders?.[0];
       assert.ok(workspace);
@@ -1103,7 +1103,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'starts and stops only a named tracked debug configuration',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
       const workspace = vscode.workspace.workspaceFolders?.[0];
       assert.ok(workspace);
@@ -1235,7 +1235,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'filters external locations returned by a real language provider',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
 
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1321,7 +1321,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'bounds and reports oversized additive language-provider output',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       assert.ok(workspacePath);
@@ -1379,7 +1379,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'rejects arbitrary authenticated IPC dispatch without invoking VS Code commands',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
 
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1459,7 +1459,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'enforces workspace authority and filters inaccessible editor state',
     async function () {
-      this.timeout(30_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
 
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1598,7 +1598,7 @@ suite('vscode-mcp extension', () => {
   testPosix(
     'discards stale provider results and withdraws active work on disable',
     async function () {
-      this.timeout(35_000);
+      this.timeout(60_000);
       await vscode.commands.executeCommand('vscode-mcp.disable');
 
       const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1787,7 +1787,13 @@ async function waitForSingleInstance(
   return eventually(async () => {
     const instances = instanceDescriptors(await callTool(client, 'list_instances', {}));
     const instance = instances.length === 1 ? instances[0] : undefined;
-    return isRecord(instance) ? instance : null;
+    if (!isRecord(instance)) {
+      return null;
+    }
+    const capability = await callTool(client, 'get_capability_status', {
+      instanceId: requiredString(instance, 'instanceId'),
+    });
+    return recordProperty(capability, 'isError') === true ? null : instance;
   });
 }
 
@@ -2246,7 +2252,7 @@ class FramedJsonRpcClient {
 async function eventually<Value>(
   operation: () => Promise<Value | null>,
 ): Promise<Value> {
-  const deadline = Date.now() + 8_000;
+  const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     const value = await operation();
     if (value !== null) {

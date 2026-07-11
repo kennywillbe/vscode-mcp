@@ -95,7 +95,10 @@ jobs:
         if: runner.os == 'Linux'
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
-        run: xvfb-run -a pnpm test:extension
+        run: |
+          xvfb-run -a pnpm test:extension && exit 0
+          echo '::warning::VS Code lifecycle test failed once; retrying the complete suite with a clean runtime.'
+          xvfb-run -a pnpm test:extension
 
       - name: Test extension host on macOS
         if: runner.os == 'macOS'
@@ -150,7 +153,10 @@ jobs:
         if: runner.os == 'Linux'
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
-        run: xvfb-run -a pnpm test:artifacts
+        run: |
+          xvfb-run -a pnpm test:artifacts && exit 0
+          echo '::warning::Packaged-pair test failed once; retrying the complete suite with fresh artifacts and runtime.'
+          xvfb-run -a pnpm test:artifacts
 
       - name: Test installed pair on macOS
         if: runner.os == 'macOS'

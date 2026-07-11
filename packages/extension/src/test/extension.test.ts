@@ -74,8 +74,11 @@ suite('vscode-mcp extension', () => {
         assert.ok(isRecord(firstFolder));
         const workspaceFolderId = requiredString(firstFolder, 'workspaceFolderId');
 
-        const capabilityResponse = await callTool(client, 'get_capability_status', {
-          instanceId,
+        const capabilityResponse = await eventually(async () => {
+          const response = await callTool(client, 'get_capability_status', {
+            instanceId,
+          });
+          return recordProperty(response, 'isError') === true ? null : response;
         });
         const capabilityResult = requiredRecord(
           requiredRecord(capabilityResponse, 'structuredContent'),
@@ -1685,14 +1688,17 @@ suite('vscode-mcp extension', () => {
           assert.ok(Array.isArray(folders));
           const folder = folders[0];
           assert.ok(isRecord(folder));
-          const read = await callTool(client, 'read_document', {
-            instanceId: restartedInstanceId,
-            document: {
-              kind: 'workspacePath',
-              workspaceFolderId: requiredString(folder, 'workspaceFolderId'),
-              relativePath: 'index.ts',
-            },
-            lineCount: 1,
+          const read = await eventually(async () => {
+            const response = await callTool(client, 'read_document', {
+              instanceId: restartedInstanceId,
+              document: {
+                kind: 'workspacePath',
+                workspaceFolderId: requiredString(folder, 'workspaceFolderId'),
+                relativePath: 'index.ts',
+              },
+              lineCount: 1,
+            });
+            return recordProperty(response, 'isError') === true ? null : response;
           });
           assert.equal(recordProperty(read, 'isError'), undefined);
         } finally {
@@ -1775,13 +1781,7 @@ async function waitForSingleInstance(
   return eventually(async () => {
     const instances = instanceDescriptors(await callTool(client, 'list_instances', {}));
     const instance = instances.length === 1 ? instances[0] : undefined;
-    if (!isRecord(instance)) {
-      return null;
-    }
-    const capability = await callTool(client, 'get_capability_status', {
-      instanceId: requiredString(instance, 'instanceId'),
-    });
-    return recordProperty(capability, 'isError') === true ? null : instance;
+    return isRecord(instance) ? instance : null;
   });
 }
 

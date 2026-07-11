@@ -1,0 +1,9 @@
+node_modules
+dist
+out
+coverage
+artifacts
+.vscode-test
+pnpm-lock.yaml
+LICENSE
+THIRD_PARTY_NOTICES.md

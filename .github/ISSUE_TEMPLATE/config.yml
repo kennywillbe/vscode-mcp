@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup and usage discussion
+    url: https://github.com/kennywillbe/vscode-mcp/discussions
+    about: Ask non-security questions and share workflows.
+  - name: Security policy
+    url: https://github.com/kennywillbe/vscode-mcp/security/policy
+    about: Read the private vulnerability reporting instructions.

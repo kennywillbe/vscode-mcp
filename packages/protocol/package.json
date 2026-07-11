@@ -1,0 +1,80 @@
+{
+  "name": "@vscode-mcp/protocol",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared contracts for vscode-mcp processes.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./bounded-jsonrpc": {
+      "types": "./src/bounded-jsonrpc.ts",
+      "import": "./src/bounded-jsonrpc.ts"
+    },
+    "./constants": {
+      "types": "./src/constants.ts",
+      "import": "./src/constants.ts"
+    },
+    "./credentials": {
+      "types": "./src/credentials.ts",
+      "import": "./src/credentials.ts"
+    },
+    "./handshake": {
+      "types": "./src/handshake.ts",
+      "import": "./src/handshake.ts"
+    },
+    "./ipc-schemas": {
+      "types": "./src/ipc-schemas.ts",
+      "import": "./src/ipc-schemas.ts"
+    },
+    "./ipc-schemas-v0.2": {
+      "types": "./src/ipc-schemas-v0.2.ts",
+      "import": "./src/ipc-schemas-v0.2.ts"
+    },
+    "./ipc-schemas-v1": {
+      "types": "./src/ipc-schemas-v1.ts",
+      "import": "./src/ipc-schemas-v1.ts"
+    },
+    "./registry-schemas": {
+      "types": "./src/registry-schemas.ts",
+      "import": "./src/registry-schemas.ts"
+    },
+    "./rpc-methods": {
+      "types": "./src/rpc-methods.ts",
+      "import": "./src/rpc-methods.ts"
+    },
+    "./runtime-registry": {
+      "types": "./src/runtime-registry.ts",
+      "import": "./src/runtime-registry.ts"
+    },
+    "./schemas": {
+      "types": "./src/schemas.ts",
+      "import": "./src/schemas.ts"
+    },
+    "./tool-schemas": {
+      "types": "./src/tool-schemas.ts",
+      "import": "./src/tool-schemas.ts"
+    },
+    "./tool-schemas-v0.2": {
+      "types": "./src/tool-schemas-v0.2.ts",
+      "import": "./src/tool-schemas-v0.2.ts"
+    },
+    "./tool-schemas-v1": {
+      "types": "./src/tool-schemas-v1.ts",
+      "import": "./src/tool-schemas-v1.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "watch": "tsc --noEmit -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "9.0.1",
+    "zod": "4.4.3"
+  }
+}

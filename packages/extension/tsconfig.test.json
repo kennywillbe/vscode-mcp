@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmitOnError": true,
+    "outDir": "out",
+    "rootDir": "src/test",
+    "types": ["node", "vscode", "mocha"]
+  },
+  "include": ["src/test/**/*.ts"],
+  "exclude": ["src/test/scanner-spike.ts"]
+}

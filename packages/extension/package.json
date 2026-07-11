@@ -1,0 +1,130 @@
+{
+  "name": "vscode-mcp",
+  "displayName": "VS Code MCP",
+  "version": "1.0.0",
+  "private": true,
+  "publisher": "vscode-mcp",
+  "description": "Secure local MCP access to VS Code IDE capabilities for coding agents.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/kennywillbe/vscode-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kennywillbe/vscode-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kennywillbe/vscode-mcp/issues"
+  },
+  "qna": "https://github.com/kennywillbe/vscode-mcp/discussions",
+  "markdown": "github",
+  "pricing": "Free",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "coding-agent",
+    "language-server",
+    "lsp",
+    "developer-tools",
+    "automation"
+  ],
+  "galleryBanner": {
+    "color": "#0f172a",
+    "theme": "dark"
+  },
+  "icon": "images/icon.png",
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:vscode-mcp.enable",
+    "onCommand:vscode-mcp.disable",
+    "onCommand:vscode-mcp.enableWrites",
+    "onCommand:vscode-mcp.disableWrites",
+    "onCommand:vscode-mcp.enableExecution",
+    "onCommand:vscode-mcp.disableExecution",
+    "onCommand:vscode-mcp.showStatus"
+  ],
+  "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "MCP access is disabled until the workspace is explicitly trusted."
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-mcp.enable",
+        "title": "Enable for This Workspace",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.disable",
+        "title": "Disable for This Workspace",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.enableWrites",
+        "title": "Enable Writes for This Session",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.disableWrites",
+        "title": "Disable Writes for This Session",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.enableExecution",
+        "title": "Enable Task and Debug Execution for This Session",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.disableExecution",
+        "title": "Disable Task and Debug Execution for This Session",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.showStatus",
+        "title": "Show Status",
+        "category": "VS Code MCP"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "pnpm run typecheck && node esbuild.mjs",
+    "build:production": "pnpm run typecheck && node esbuild.mjs --production",
+    "clean": "rimraf dist out .vscode-test",
+    "compile-tests": "rimraf out && tsc -p tsconfig.test.json",
+    "typecheck-test:scanner": "tsc -p tsconfig.scanner-test.json",
+    "bundle-test:scanner": "node esbuild-test.mjs scanner-spike",
+    "package:vsix": "node ../../scripts/package-extension.mjs",
+    "research:scanner": "pnpm run typecheck-test:scanner && pnpm run bundle-test:scanner && rimraf .vscode-test/user-data && vscode-test --config .vscode-test-scanner-spike.mjs",
+    "research:write": "pnpm run compile-tests && rimraf .vscode-test/user-data && vscode-test --config .vscode-test-write-spike.mjs",
+    "test:integration": "pnpm --filter @vscode-mcp/server run build && pnpm run compile-tests && pnpm run build && node prepare-test-runtime.mjs && vscode-test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "watch": "concurrently -k -n types,bundle \"pnpm watch:types\" \"pnpm watch:bundle\"",
+    "watch:bundle": "node esbuild.mjs --watch",
+    "watch:types": "tsc --noEmit -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "@vscode-mcp/protocol": "workspace:*",
+    "vscode-jsonrpc": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/mocha": "10.0.10",
+    "@types/vscode": "1.101.0",
+    "@vscode/test-cli": "0.0.15",
+    "@vscode/test-electron": "3.0.0"
+  }
+}

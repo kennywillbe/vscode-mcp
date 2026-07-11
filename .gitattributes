@@ -1,0 +1,2 @@
+# Preserve bundled upstream license text verbatim, including its original whitespace.
+THIRD_PARTY_NOTICES.md whitespace=-trailing-space

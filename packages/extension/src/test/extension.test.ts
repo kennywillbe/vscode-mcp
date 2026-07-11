@@ -64,19 +64,7 @@ suite('vscode-mcp extension', () => {
 
         await vscode.commands.executeCommand('vscode-mcp.enable');
 
-        const listed = await eventually(async () => {
-          const response = await callTool(client, 'list_instances', {});
-          const structured = requiredRecord(response, 'structuredContent');
-          const result = requiredRecord(structured, 'result');
-          const instances = result['instances'];
-          return Array.isArray(instances) && instances.length === 1 ? structured : null;
-        });
-        const listResult = requiredRecord(listed, 'result');
-        const instances = listResult['instances'];
-        assert.ok(Array.isArray(instances));
-        assert.equal(instances.length, 1);
-        const firstInstance = instances[0];
-        assert.ok(isRecord(firstInstance));
+        const firstInstance = await waitForSingleInstance(client);
         assertNoForbiddenInstanceMetadata(firstInstance);
         const instanceId = requiredString(firstInstance, 'instanceId');
         assert.equal(await registryRecordExists(instanceId), true);

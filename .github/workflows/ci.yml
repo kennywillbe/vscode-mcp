@@ -13,6 +13,7 @@ permissions:
 
 env:
   NODE_VERSION: 22.13.0
+  COREPACK_VERSION: 0.35.0
   PNPM_VERSION: 10.24.0
 
 jobs:
@@ -39,8 +40,9 @@ jobs:
 
       - name: Activate pinned pnpm
         run: |
+          npm install --global corepack@${COREPACK_VERSION}
           corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
+          corepack install --global pnpm@${PNPM_VERSION}
           test "$(pnpm --version)" = "${PNPM_VERSION}"
 
       - name: Install locked dependencies
@@ -81,8 +83,9 @@ jobs:
 
       - name: Activate pinned pnpm
         run: |
+          npm install --global corepack@${COREPACK_VERSION}
           corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
+          corepack install --global pnpm@${PNPM_VERSION}
           test "$(pnpm --version)" = "${PNPM_VERSION}"
 
       - name: Install locked dependencies
@@ -129,8 +132,9 @@ jobs:
 
       - name: Activate pinned pnpm
         run: |
+          npm install --global corepack@${COREPACK_VERSION}
           corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
+          corepack install --global pnpm@${PNPM_VERSION}
           test "$(pnpm --version)" = "${PNPM_VERSION}"
 
       - name: Install locked dependencies
@@ -172,8 +176,9 @@ jobs:
 
       - name: Activate pinned pnpm
         run: |
+          npm install --global corepack@${COREPACK_VERSION}
           corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
+          corepack install --global pnpm@${PNPM_VERSION}
           test "$(pnpm --version)" = "${PNPM_VERSION}"
 
       - name: Install locked dependencies

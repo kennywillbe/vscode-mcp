@@ -26,7 +26,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-15
+          - macos-15-intel
 
     steps:
       - name: Check out repository
@@ -66,7 +66,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-15
+          - macos-15-intel
         vscode:
           - 1.101.0
           - stable
@@ -121,7 +121,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-15
+          - macos-15-intel
         vscode:
           - 1.101.0
           - stable

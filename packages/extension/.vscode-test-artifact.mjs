@@ -12,7 +12,7 @@ export default defineConfig({
   },
   files: 'out/**/*.test.js',
   version: process.env['VSCODE_TEST_VERSION'] ?? 'stable',
-  launchArgs: process.platform === 'linux' ? ['--disable-gpu'] : [],
+  launchArgs: ['--disable-gpu'],
   extensionDevelopmentPath,
   installExtensions: [vsix],
   workspaceFolder: '../../fixtures/extension-host.code-workspace',

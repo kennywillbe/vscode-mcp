@@ -38,7 +38,7 @@ import {
   type RuntimeRegistryPaths,
 } from '@vscode-mcp/protocol/runtime-registry';
 import type { V1AllExtensionToolName } from '@vscode-mcp/protocol/tool-schemas-v1';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CancellationTokenSource,
   createMessageConnection,
@@ -92,6 +92,8 @@ interface FixtureServiceOptions {
   readonly callTool?: IpcCallToolHandler;
   readonly schedulerRuntime?: SchedulerRuntime;
   readonly credentialDependencies?: InstanceCredentialDependencies;
+  readonly isEligible?: () => boolean;
+  readonly onUnexpectedStop?: () => void;
 }
 
 async function startFixture(
@@ -127,7 +129,7 @@ async function startFixture(
   const service = new IpcInstanceService({
     identity,
     runtimeEnvironment,
-    isEligible: () => true,
+    isEligible: options.isEligible ?? (() => true),
     ...(options.extensionTools === undefined
       ? {}
       : { extensionTools: options.extensionTools }),
@@ -138,6 +140,9 @@ async function startFixture(
     ...(options.credentialDependencies === undefined
       ? {}
       : { credentialDependencies: options.credentialDependencies }),
+    ...(options.onUnexpectedStop === undefined
+      ? {}
+      : { onUnexpectedStop: options.onUnexpectedStop }),
   });
   services.push(service);
 
@@ -160,6 +165,32 @@ async function startFixture(
   }
   return { service, paths: resolution.paths, snapshot };
 }
+
+it('notifies once after an eligibility-losing heartbeat stops the service', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  try {
+    let eligible = true;
+    let notifications = 0;
+    const notified = deferred();
+    const running = await startFixture({
+      isEligible: () => eligible,
+      onUnexpectedStop: () => {
+        notifications += 1;
+        notified.resolve();
+      },
+    });
+
+    eligible = false;
+    await vi.advanceTimersByTimeAsync(PROTOCOL_LIMITS.registryHeartbeatIntervalMs);
+    await notified.promise;
+
+    expect(notifications).toBe(1);
+    const discovery = await discoverRegistryRecords(running.paths);
+    expect(discovery).toMatchObject({ status: 'ready', records: [] });
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 interface TestClient {
   readonly socket: Socket;

@@ -115,6 +115,7 @@ export interface IpcInstanceServiceOptions {
   readonly extensionTools?: readonly V1AllExtensionToolName[];
   readonly callTool?: IpcCallToolHandler;
   readonly schedulerRuntime?: SchedulerRuntime;
+  readonly onUnexpectedStop?: () => void;
 }
 
 export type IpcCallToolHandler = (
@@ -904,6 +905,7 @@ export class IpcInstanceService {
   private heartbeatOperation: Promise<void> | undefined;
   private startOperation: Promise<IpcInstanceServiceStartResult> | undefined;
   private stopOperation: Promise<void> | undefined;
+  private unexpectedStopNotified = false;
 
   public constructor(private readonly options: IpcInstanceServiceOptions) {
     this.scheduler = new RequestScheduler(options.schedulerRuntime);
@@ -1121,7 +1123,7 @@ export class IpcInstanceService {
 
   private readonly handleServerError = (): void => {
     if (this.lifecycle === 'running' || this.lifecycle === 'starting') {
-      void this.stop().catch(() => undefined);
+      this.stopUnexpectedly();
     }
   };
 
@@ -1153,9 +1155,20 @@ export class IpcInstanceService {
         if (this.heartbeatOperation === operation) {
           this.heartbeatOperation = undefined;
         }
-        void this.stop().catch(() => undefined);
+        this.stopUnexpectedly();
       },
     );
+  }
+
+  private stopUnexpectedly(): void {
+    if (this.unexpectedStopNotified) {
+      return;
+    }
+    this.unexpectedStopNotified = true;
+    const notify = (): void => {
+      this.options.onUnexpectedStop?.();
+    };
+    void this.stop().then(notify, notify);
   }
 
   private async performHeartbeat(): Promise<void> {

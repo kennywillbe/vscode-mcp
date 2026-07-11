@@ -256,6 +256,9 @@ class ExtensionController implements vscode.Disposable {
           }
           return this.#toolRouter.callTool(invocation, signal);
         },
+        onUnexpectedStop: () => {
+          void this.recoverUnexpectedServiceStop(service);
+        },
       });
       this.#service = service;
       this.#serviceFingerprint = identity.fingerprint;
@@ -281,6 +284,22 @@ class ExtensionController implements vscode.Disposable {
     }
 
     this.updateStatus(eligibility, enabled === true);
+  }
+
+  private async recoverUnexpectedServiceStop(
+    service: IpcInstanceService,
+  ): Promise<void> {
+    if (this.#disposed || this.#service !== service) {
+      return;
+    }
+    this.#grants.revokeAll();
+    this.#runtime?.dispose();
+    this.#service = undefined;
+    this.#runtime = undefined;
+    this.#serviceFingerprint = undefined;
+    this.#serviceFolderKey = undefined;
+    this.#serviceStartResult = undefined;
+    await this.refresh();
   }
 
   private updateStatus(eligibility: Eligibility, enabled: boolean): void {

@@ -12,7 +12,7 @@ is outside the 1.0 matrix and is covered by `docs/windows-support-plan.md`.
 
 ## Executed gates
 
-- `pnpm check`: format, ESLint, all package typechecks, 46 files / 433 unit and
+- `pnpm check`: format, ESLint, all package typechecks, 46 files / 434 unit and
   acceptance tests.
 - `pnpm test:extension`: 13 real Extension Host workflows through MCP stdio,
   authenticated IPC, the production router, and live VS Code APIs.

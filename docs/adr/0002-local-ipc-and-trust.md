@@ -69,5 +69,5 @@ authenticated handshake.
 
 The accepted [IPC protocol](../internal-ipc-v1.md) is the canonical wire and lifecycle
 contract. See [the security model](../security-model.md) for authorization rules and
-limits, and [the acceptance criteria](../security-acceptance-criteria.md) for the
-Milestone 1 test gate.
+limits, and [the security acceptance evidence](../security-acceptance-report-1.0.md) for
+the corresponding test evidence.

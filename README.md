@@ -93,7 +93,7 @@ See the [full 1.0 security model](./docs/security-model-v1.0-full-ide.md), the i
 [read/transport security model](./docs/security-model.md),
 [internal IPC contract](./docs/internal-ipc-v1.md), and
 [security acceptance evidence](./docs/security-acceptance-report-v1.0-full-ide.md) for
-the exact boundary and current release gates.
+the exact boundary and verification evidence.
 
 ## Repository layout
 
@@ -178,10 +178,10 @@ before the first public `1.0.0` GitHub Release. After that release is verified, 
 VSIX is published to the VS Code Marketplace. Open VSX, npm, JSR, Yarn, and Bun remain
 out of scope.
 
-The [roadmap](./ROADMAP.md) is the publication authority. Installation, upgrade,
-downgrade, and removal are documented in [docs/installation.md](./docs/installation.md).
-The current verification results and local-candidate checklist are in the
-[1.0 maintainer handoff](./docs/maintainer-handoff-1.0.md).
+Installation, upgrade, downgrade, and removal are documented in
+[docs/installation.md](./docs/installation.md). Candidate construction and verification
+are documented in [docs/release-process.md](./docs/release-process.md); publishing still
+requires an explicit maintainer decision.
 
 ## Contributing and license
 

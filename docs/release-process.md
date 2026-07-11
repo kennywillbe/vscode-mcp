@@ -3,17 +3,16 @@
 This process creates the exact files that can later be attached to the first GitHub
 Release and supplies the unchanged VSIX for manual Marketplace upload. It does not
 create a repository, tag, GitHub Release, Marketplace listing, or package-registry
-publication. Publication remains the separate, maintainer-approved **Release 1.0** step
-in [ROADMAP.md](../ROADMAP.md).
+publication. Publication remains a separate, explicit maintainer-approved action.
 
 ## Preconditions
 
 Use a clean reviewed source snapshot with Node.js 22 and the pnpm version pinned in
-`package.json`. Before packaging, confirm Milestones 0–4 and Milestone 5's pre-artifact
-gates are complete. Packaging and exact-artifact acceptance then close Milestone 5. The
-script enforces the mechanical version gate: the root, extension, server, and protocol
-package manifests must all be exactly `1.0.0`. It exits before building or writing
-artifacts if any version differs.
+`package.json`. Before packaging, confirm the accepted contracts, security evidence,
+static checks, Extension Host tests, and packaged-pair tests are current. The script
+enforces the mechanical version gate: the root, extension, server, and protocol package
+manifests must all be exactly `1.0.0`. It exits before building or writing artifacts if
+any version differs.
 
 Install and validate the exact locked dependency graph:
 

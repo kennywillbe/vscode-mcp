@@ -226,6 +226,5 @@ debugger, formatter, or mutation API.
 - Same-user malicious processes and a compromised extension host remain outside the
   inherited confidentiality boundary.
 
-The accepted
-[`v0.2 read acceptance criteria`](./security-acceptance-criteria-v0.2-read.md) turn
-these requirements into the mandatory implementation test gate.
+The accepted [`security acceptance evidence`](./security-acceptance-report-1.0.md) maps
+these requirements to the implementation test gate.

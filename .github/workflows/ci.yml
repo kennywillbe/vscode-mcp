@@ -8,6 +8,10 @@ on:
       - 'v*'
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -219,3 +223,27 @@ jobs:
           path: artifacts/release-1.0.0/
           if-no-files-found: error
           retention-days: 7
+
+  ci-gate:
+    name: CI gate
+    if: ${{ always() }}
+    needs:
+      - validate
+      - extension-host
+      - packaged-pair
+      - package-release-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Require every CI stage
+        env:
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          EXTENSION_HOST_RESULT: ${{ needs.extension-host.result }}
+          PACKAGED_PAIR_RESULT: ${{ needs.packaged-pair.result }}
+          RELEASE_CANDIDATE_RESULT: ${{ needs.package-release-candidate.result }}
+        run: |
+          test "$VALIDATE_RESULT" = success
+          test "$EXTENSION_HOST_RESULT" = success
+          test "$PACKAGED_PAIR_RESULT" = success
+          test "$RELEASE_CANDIDATE_RESULT" = success

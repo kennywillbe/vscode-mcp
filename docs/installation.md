@@ -28,7 +28,7 @@ is not a public release artifact.
 Windows, Remote SSH, WSL, Dev Containers, Codespaces, VS Code for the Web, virtual
 workspaces, Snap, and Flatpak are not supported by version 1.0. Windows returns
 `WINDOWS_ACL_NOT_IMPLEMENTED` before creating a listener or registry record; see the
-[deferred-platform record](./windows-ipc-decision.md).
+[Windows support plan](./windows-support-plan.md).
 
 ## Verify the release files
 

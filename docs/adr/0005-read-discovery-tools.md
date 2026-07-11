@@ -37,8 +37,8 @@ Introduce exactly three additive read-only tools in the proposed
 
 The detailed wire shapes and limits live in
 [`../tool-contract-v0.2.md`](../tool-contract-v0.2.md). The security delta and test gate
-live in [`../security-model-v0.2-read.md`](../security-model-v0.2-read.md) and
-[`../security-acceptance-criteria-v0.2-read.md`](../security-acceptance-criteria-v0.2-read.md).
+live in [`../security-model-v0.2-read.md`](../security-model-v0.2-read.md) and the
+[`../security-acceptance-report-1.0.md`](../security-acceptance-report-1.0.md) evidence.
 
 ### Authority and scope
 
@@ -137,7 +137,7 @@ live in [`../security-model-v0.2-read.md`](../security-model-v0.2-read.md) and
 
 ## Acceptance scope
 
-This ADR was accepted together with the v0.2 read security model, acceptance criteria,
+This ADR was accepted together with the v0.2 read security model, acceptance evidence,
 and frozen contract. Acceptance authorizes schema and implementation work for these
 three read-only tools only. It does not accept ADR 0004, enable writes, or alter the 1.0
 release candidate.

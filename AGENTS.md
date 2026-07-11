@@ -15,11 +15,10 @@ Before making a change, read:
 
 1. `AGENTS.md`
 2. `README.md`
-3. `ROADMAP.md`
-4. The relevant files in `docs/adr/`
-5. `docs/security-model.md` for anything touching IPC, paths, authentication, logging,
+3. The relevant files in `docs/adr/`
+4. `docs/security-model.md` for anything touching IPC, paths, authentication, logging,
    workspace selection, or VS Code APIs
-6. `docs/tool-contract-v1.0.md` for complete-product MCP tools or their results; consult
+5. `docs/tool-contract-v1.0.md` for complete-product MCP tools or their results; consult
    the inherited v0.1/v0.2 baselines only when the active contract references them
 
 Inspect the working tree before editing. Existing changes belong to the maintainer or
@@ -193,7 +192,7 @@ test unless the maintained contract itself intentionally changes.
   distribution decisions as ADRs.
 - State whether an ADR is `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
 - Keep `README.md` factual. Do not describe planned behavior as already implemented.
-- Keep `ROADMAP.md` statuses and release gates current.
+- Keep the accepted contracts, security evidence, and release process current.
 - When documentation and code disagree, do not guess silently: determine which is the
   accepted contract and update both together.
 
@@ -219,5 +218,5 @@ test unless the maintained contract itself intentionally changes.
 - The extension and server are two parts of one product and MUST preserve the accepted
   IPC/tool compatibility boundary across Marketplace updates.
 - Auto-update services implemented by this project and telemetry remain prohibited.
-- A locally generated scaffold VSIX is not a public release artifact until every gate in
-  `ROADMAP.md` is complete.
+- A locally generated scaffold VSIX is not a public release artifact until the release
+  process and security acceptance evidence pass for the exact source snapshot.

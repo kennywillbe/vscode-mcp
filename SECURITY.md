@@ -7,9 +7,9 @@ the default branch and included in the next GitHub release artifact.
 
 ## Reporting a vulnerability
 
-Do not open a public issue for a suspected vulnerability. Until a dedicated private
-reporting channel is configured on GitHub, contact the repository owner privately and
-include:
+Do not open a public issue for a suspected vulnerability. Use GitHub's
+[private vulnerability report](https://github.com/kennywillbe/vscode-mcp/security/advisories/new)
+and include:
 
 - The affected revision or release.
 - Reproduction steps or a proof of concept.

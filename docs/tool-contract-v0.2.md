@@ -402,8 +402,8 @@ remain on v0.1 until a separately verified promotion step.
 The proposed security gate is defined by
 [`ADR 0005`](./adr/0005-read-discovery-tools.md), the
 [`v0.2 read security-model delta`](./security-model-v0.2-read.md), and the
-[`v0.2 read acceptance criteria`](./security-acceptance-criteria-v0.2-read.md). ADR 0004
-remains the separate authority for future write capability.
+[`security acceptance evidence`](./security-acceptance-report-1.0.md). ADR 0004 remains
+the separate authority for future write capability.
 
 The final implementation evidence is summarized in
 [`agent-workflow-benchmarks.md`](./agent-workflow-benchmarks.md). Discovery and search

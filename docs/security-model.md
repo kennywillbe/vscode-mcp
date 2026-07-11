@@ -184,8 +184,8 @@ are descriptive hints and never replace server-side enforcement.
 
 The accepted [internal IPC contract](./internal-ipc-v1.md) defines the canonical wire,
 registry, and lifecycle behavior. The
-[Milestone 1 acceptance criteria](./security-acceptance-criteria.md) turn these
-boundaries into required test cases.
+[Security acceptance evidence](./security-acceptance-report-1.0.md) maps these
+boundaries to repeatable test cases.
 
 ## Deferred environments and future work
 

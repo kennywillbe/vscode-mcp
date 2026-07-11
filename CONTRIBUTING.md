@@ -5,8 +5,8 @@ workspace metadata as sensitive, so small changes still need explicit boundary t
 
 ## Before changing code
 
-Read [AGENTS.md](./AGENTS.md), the [roadmap](./ROADMAP.md), the relevant architecture
-decision records, the [security model](./docs/security-model.md), and the
+Read [AGENTS.md](./AGENTS.md), the relevant architecture decision records, the
+[security model](./docs/security-model.md), and the
 [1.0 tool contract](./docs/tool-contract-v1.0.md). `AGENTS.md` is normative for
 contributors and coding agents.
 

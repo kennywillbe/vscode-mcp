@@ -85,5 +85,6 @@ Windows can enter the support matrix only when:
 5. no shell or weaker IPC fallback exists; and
 6. the maintainer explicitly approves a post-1.0 release version.
 
-Until then, `WINDOWS_ACL_NOT_IMPLEMENTED` remains the required behavior. The original
-rationale is in [the Windows 1.0 scope decision](./windows-ipc-decision.md).
+Until then, `WINDOWS_ACL_NOT_IMPLEMENTED` remains the required behavior. Version 1.0
+must not create or publish a Windows listener or registry record, and must not fall back
+to TCP, a default-DACL named pipe, shell-based ACL repair, or random-name authorization.

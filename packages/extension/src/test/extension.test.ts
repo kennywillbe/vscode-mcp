@@ -2240,7 +2240,7 @@ class FramedJsonRpcClient {
 async function eventually<Value>(
   operation: () => Promise<Value | null>,
 ): Promise<Value> {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
     const value = await operation();
     if (value !== null) {

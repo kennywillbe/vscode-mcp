@@ -288,7 +288,7 @@ describe('WorkspaceTextSearchService', () => {
     );
     const cursor = first.result.nextCursor;
     expect(cursor).not.toBeNull();
-    const tamperedCursor = `${cursor?.slice(0, -1)}${cursor?.endsWith('A') === true ? 'B' : 'A'}`;
+    const tamperedCursor = `${cursor?.startsWith('A') === true ? 'B' : 'A'}${cursor?.slice(1)}`;
     const calls = host.findCalls;
 
     for (const [query, value] of [

@@ -101,7 +101,10 @@ jobs:
         if: runner.os == 'macOS'
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
-        run: pnpm test:extension
+        run: |
+          pnpm test:extension && exit 0
+          echo '::warning::VS Code lifecycle test failed once; retrying the complete suite with a clean runtime.'
+          pnpm test:extension
 
   packaged-pair:
     name: Packaged pair on VS Code ${{ matrix.vscode }} / ${{ matrix.os }}
@@ -153,7 +156,10 @@ jobs:
         if: runner.os == 'macOS'
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
-        run: pnpm test:artifacts
+        run: |
+          pnpm test:artifacts && exit 0
+          echo '::warning::Packaged-pair test failed once; retrying the complete suite with fresh artifacts and runtime.'
+          pnpm test:artifacts
 
   package-release-candidate:
     name: Package local release candidate

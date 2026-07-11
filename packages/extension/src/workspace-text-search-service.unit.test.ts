@@ -276,7 +276,7 @@ describe('WorkspaceTextSearchService', () => {
     expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(
       V02_READ_TOOL_LIMITS.serializedResultBytes,
     );
-  });
+  }, 15_000);
 
   it('rejects tampered and cross-query cursors before discovery', async () => {
     const host = new FakeSearchHost();

@@ -3,7 +3,18 @@
 All notable changes to `vscode-mcp` are documented here. The project uses Semantic
 Versioning for its public release artifacts.
 
-## 1.0.0 — unreleased candidate work
+## 1.0.1 — 2026-07-12
+
+- Fixed a VS Code 1.101 lifecycle race that could leave an explicitly enabled workspace
+  temporarily ineligible and undiscoverable during first activation.
+- Added bounded, observation-only enable retries that preserve concurrent disable,
+  workspace-identity changes, and fail-closed authorization behavior.
+- Added bounded listener-start retries with complete per-attempt cleanup and safe
+  startup-stage diagnostics.
+- Added deterministic regression coverage for transient startup failures, persistent
+  failure bounds, shutdown races, and packaged Extension Host discovery.
+
+## 1.0.0 — 2026-07-12
 
 - Added an authenticated, versioned, user-scoped local bridge between MCP `stdio` and
   explicitly enabled VS Code Desktop workspaces.
@@ -35,5 +46,4 @@ Versioning for its public release artifacts.
   its original promise settles.
 
 Version 1.0 targets standard local VS Code Desktop on macOS and Linux. Windows is a
-post-1.0 roadmap item and fails closed before IPC publication. No remote repository or
-artifact has been published.
+post-1.0 roadmap item and fails closed before IPC publication.

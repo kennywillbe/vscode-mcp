@@ -1,7 +1,7 @@
 {
   "name": "vscode-mcp",
   "displayName": "VS Code MCP",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "publisher": "vscode-mcp",
   "description": "Secure local MCP access to VS Code IDE capabilities for coding agents.",

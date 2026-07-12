@@ -1,6 +1,6 @@
 {
   "name": "vscode-mcp-workspace",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Secure, multi-window MCP access to VS Code language intelligence.",
   "license": "Apache-2.0",
@@ -38,7 +38,7 @@
     "test": "pnpm run test:unit && pnpm run test:extension",
     "test:artifacts": "node scripts/test-release-artifacts.mjs",
     "test:extension": "pnpm --filter vscode-mcp run test:integration",
-    "test:local": "node scripts/test-release-artifacts.mjs --vsix artifacts/local/vscode-mcp-extension-1.0.0.vsix --server packages/server/dist/cli.mjs",
+    "test:local": "node scripts/test-release-artifacts.mjs --vsix artifacts/local/vscode-mcp-extension-1.0.1.vsix --server packages/server/dist/cli.mjs",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "typecheck": "pnpm -r --if-present run typecheck"

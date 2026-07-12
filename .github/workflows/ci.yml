@@ -19,6 +19,7 @@ env:
   NODE_VERSION: 22.13.0
   COREPACK_VERSION: 0.35.0
   PNPM_VERSION: 10.24.0
+  RELEASE_VERSION: 1.0.1
 
 jobs:
   validate:
@@ -209,18 +210,18 @@ jobs:
       - name: Package first release candidate
         run: |
           pnpm package:release
-          cp artifacts/release-1.0.0/SHA256SUMS /tmp/vscode-mcp-first-SHA256SUMS
+          cp "artifacts/release-${RELEASE_VERSION}/SHA256SUMS" /tmp/vscode-mcp-first-SHA256SUMS
 
       - name: Rebuild and verify reproducibility
         run: |
           pnpm package:release
-          cmp /tmp/vscode-mcp-first-SHA256SUMS artifacts/release-1.0.0/SHA256SUMS
+          cmp /tmp/vscode-mcp-first-SHA256SUMS "artifacts/release-${RELEASE_VERSION}/SHA256SUMS"
 
       - name: Upload packaged candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vscode-mcp-local-release-candidate
-          path: artifacts/release-1.0.0/
+          path: artifacts/release-1.0.1/
           if-no-files-found: error
           retention-days: 7
 

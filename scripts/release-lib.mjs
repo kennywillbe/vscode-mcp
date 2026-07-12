@@ -14,7 +14,7 @@ import {
 import path from 'node:path';
 import { deflateRawSync, gunzipSync, gzipSync, inflateRawSync } from 'node:zlib';
 
-export const RELEASE_VERSION = '1.0.0';
+export const RELEASE_VERSION = '1.0.1';
 export const RELEASE_DIRECTORY_NAME = `release-${RELEASE_VERSION}`;
 
 const PACKAGE_MANIFESTS = [

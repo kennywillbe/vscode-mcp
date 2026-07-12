@@ -216,8 +216,11 @@ discovery and may be removed only after their ownership, type, age, and name pat
 validated.
 
 The extension writes a heartbeat every 5 seconds by atomically replacing the record with
-a new `heartbeatAt`. A record becomes a stale candidate when its validated `heartbeatAt`
-is at least 60 seconds old. Age alone never permits deletion.
+a new `heartbeatAt`. A publication or verification failure is retried up to three times
+with a short fixed delay while the same listener and workspace eligibility remain
+current. Persistent failure withdraws the listener and record; transient failure does
+not rotate the instance ID. A record becomes a stale candidate when its validated
+`heartbeatAt` is at least 60 seconds old. Age alone never permits deletion.
 
 Stale cleanup requires all of the following:
 
@@ -520,6 +523,16 @@ CLI selectors are lifetime upper bounds, not authorization:
   it or override a CLI selector.
 - Multiple remaining candidates produce `INSTANCE_AMBIGUOUS`; there is no last-focused,
   first-record, or most-recent fallback.
+
+For usability across an unexpected listener restart, the bridge may retain at most 64
+authenticated instance-to-workspace identities in memory for 60 seconds. If a caller
+requests a recently observed missing instance and exactly one currently authenticated,
+in-bound instance has the same canonical workspace identity, `INSTANCE_NOT_FOUND` may
+include the safe scalar detail `replacementInstanceId`. The bridge never redirects the
+call automatically, never emits a hint for an instance-pinned bridge, and emits no hint
+when identity is unknown, expired, out of bound, or ambiguous. This cache contains no
+token, endpoint, content, or persistent alias and is not authorization; listener restart
+still revokes write/execution grants.
 
 The bridge considers at most 64 valid instance records in one discovery result. If the
 validated candidate set exceeds that upper bound, it fails closed with a bounded error

@@ -3,6 +3,26 @@
 All notable changes to `vscode-mcp` are documented here. The project uses Semantic
 Versioning for its public release artifacts.
 
+## 1.1.0 — 2026-07-13
+
+- Added bounded, memory-only visual tracking for successful MCP mutations with
+  theme-aware editor decorations, Explorer/status indicators, exact next/previous
+  navigation, per-file/session clearing, native side-by-side review for one file, and VS
+  Code's multi-file changes editor for complete-session review.
+- Added secure before-snapshot handling for edits, creates, moves, and deletes, with
+  explicit per-snapshot, aggregate-memory, file-count, and marker limits and immediate
+  teardown on manual edits, revoke, disable, restart, or reload.
+- Added package-manager-aware configured-task metadata without exposing task commands,
+  arguments, environment values, or paths.
+- Improved literal workspace search contracts for leading/trailing whitespace and made
+  context-line bounds visible in the MCP schema.
+- Improved document-symbol results with bounded flat-provider fallback and explicit
+  incomplete-hierarchy warnings.
+- Added bounded replacement-instance hints so agents can recover from a VS Code listener
+  identity rotation without rediscovering unrelated windows.
+- Added unit, security-surface, real Extension Host, native diff, and Linux-container
+  regression coverage for the new behavior.
+
 ## 1.0.1 — 2026-07-12
 
 - Fixed a VS Code 1.101 lifecycle race that could leave an explicitly enabled workspace

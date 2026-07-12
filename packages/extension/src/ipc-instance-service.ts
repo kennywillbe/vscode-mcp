@@ -97,6 +97,8 @@ const SOCKET_MODE = 0o600;
 const PERMISSION_MASK = 0o7777;
 const LISTENER_START_ATTEMPTS = 3;
 const LISTENER_START_RETRY_DELAY_MS = 25;
+const HEARTBEAT_ATTEMPTS = 3;
+const HEARTBEAT_RETRY_DELAY_MS = 25;
 
 export interface IpcInstanceServiceIdentity {
   readonly extensionVersion: string;
@@ -1221,28 +1223,49 @@ export class IpcInstanceService {
   }
 
   private async performHeartbeat(): Promise<void> {
-    const active = this.active;
-    if (active === undefined || !this.eligibilityIsCurrent()) {
-      throw new Error('The instance is no longer eligible.');
-    }
-
     const dependencies =
       this.options.registryDependencies ?? NODE_RUNTIME_REGISTRY_DEPENDENCIES;
-    const nextRecord = RegistryRecordSchema.parse({
-      ...active.record,
-      heartbeatAt: this.nowIso(),
-    });
-    await writeRegistryRecord(active.paths, nextRecord, dependencies);
-    const snapshot = await readRegistryRecordSnapshot(
-      active.paths,
-      active.credentials.instanceId,
-      dependencies,
-    );
-    if (snapshot === null) {
-      throw new Error('The heartbeat publication could not be verified.');
+    for (let attempt = 1; attempt <= HEARTBEAT_ATTEMPTS; attempt += 1) {
+      const active = this.active;
+      if (
+        this.lifecycle !== 'running' ||
+        active === undefined ||
+        !this.eligibilityIsCurrent()
+      ) {
+        throw new Error('The instance is no longer eligible.');
+      }
+
+      const nextRecord = RegistryRecordSchema.parse({
+        ...active.record,
+        heartbeatAt: this.nowIso(),
+      });
+      try {
+        await writeRegistryRecord(active.paths, nextRecord, dependencies);
+        const snapshot = await readRegistryRecordSnapshot(
+          active.paths,
+          active.credentials.instanceId,
+          dependencies,
+        );
+        if (snapshot === null) {
+          throw new Error('The heartbeat publication could not be verified.');
+        }
+        active.record = nextRecord;
+        active.snapshot = snapshot;
+        return;
+      } catch (error: unknown) {
+        if (
+          attempt === HEARTBEAT_ATTEMPTS ||
+          this.lifecycle !== 'running' ||
+          this.active !== active ||
+          !this.eligibilityIsCurrent()
+        ) {
+          throw error;
+        }
+        await new Promise<void>((resolveDelay) =>
+          setTimeout(resolveDelay, HEARTBEAT_RETRY_DELAY_MS),
+        );
+      }
     }
-    active.record = nextRecord;
-    active.snapshot = snapshot;
   }
 
   private async performStop(): Promise<void> {

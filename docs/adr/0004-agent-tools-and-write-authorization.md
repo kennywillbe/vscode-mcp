@@ -87,12 +87,36 @@ items, preview tokens, response bytes, queues, concurrency, and deadlines. Error
 contain source text, replacement content, absolute paths, provider command arguments, or
 other sibling details.
 
+### Visual mutation attribution
+
+- After a successful commit, the extension projects the already validated pre-edit
+  UTF-16 ranges into exact post-edit ranges and renders theme-aware added, modified, and
+  deleted decorations in open editors and the overview ruler.
+- Created and moved files receive bounded file-level attribution; deleted files remain
+  visible only as a session review entry because no resource remains to decorate.
+- Explorer badges, a separate status item, single-file `vscode.diff`, multi-file
+  `vscode.changes`, next/previous navigation, and current-file/session clear commands
+  are extension UI only. They do not change the MCP contract or authorize a mutation.
+- At most 200 files and 4,096 visual markers are retained. A before-snapshot is capped
+  at 2 MiB and all retained snapshots at 32 MiB. Snapshots are immutable, memory-only,
+  listener-scoped virtual documents and are never logged, persisted, or returned over
+  MCP.
+- Attribution is listener-scoped and memory-only. A manual or external text change
+  clears that file's record rather than presenting stale ownership. Write revocation,
+  trust/read loss, workspace change, listener stop, reload, or explicit user action
+  clears the applicable records.
+- Visual projection and rendering happen outside the mutation commit boundary and are
+  best-effort: a UI failure cannot turn an already committed edit into a reported tool
+  failure.
+
 ## Security consequences
 
 - A compromised MCP client with a granted write session can modify the enabled
   workspace; the visible grant is a high-impact authority and must be easy to revoke.
 - The bridge remains untrusted for scope enforcement.
 - Provider output cannot escape the workspace or smuggle command execution.
+- Visual attribution persists no content and creates no new bridge, transport, or write
+  authority.
 - Direct arbitrary filesystem writes, recursive deletion, overwrite, generic command
   execution, and automatic saving after edits remain prohibited.
 - Execution of workspace code is a separate authority governed by ADR 0007.

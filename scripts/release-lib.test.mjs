@@ -46,10 +46,10 @@ describe('release version preflight', () => {
   it('rejects a mismatched workspace package before packaging', async () => {
     const root = await temporaryDirectory();
     for (const [relativePath, version] of [
-      ['package.json', '1.0.1'],
-      ['packages/extension/package.json', '1.0.1'],
+      ['package.json', '1.1.0'],
+      ['packages/extension/package.json', '1.1.0'],
       ['packages/server/package.json', '0.9.0'],
-      ['packages/protocol/package.json', '1.0.1'],
+      ['packages/protocol/package.json', '1.1.0'],
     ]) {
       const destination = path.join(root, relativePath);
       await mkdir(path.dirname(destination), { recursive: true });
@@ -58,7 +58,7 @@ describe('release version preflight', () => {
     const before = await snapshotDirectory(root);
 
     await expect(assertReleaseVersions(root)).rejects.toThrow(
-      'packages/server/package.json: expected 1.0.1, found 0.9.0',
+      'packages/server/package.json: expected 1.1.0, found 0.9.0',
     );
     expect(await snapshotDirectory(root)).toEqual(before);
   });
@@ -193,7 +193,7 @@ describe('deterministic release archives', () => {
         'packages/server/package.json',
         serializeJson({
           name: '@vscode-mcp/server',
-          version: '1.0.1',
+          version: '1.1.0',
           engines: { node: '^22.13.0' },
         }),
       ],
@@ -217,7 +217,7 @@ describe('deterministic release archives', () => {
     const archivePath = await stageServerArchive({
       destinationDirectory,
       repositoryRoot,
-      version: '1.0.1',
+      version: '1.1.0',
     });
     const archive = await readFile(archivePath);
     const entries = inspectTarGzip(archive);
@@ -301,7 +301,7 @@ describe('deterministic release archives', () => {
     ]);
     expect(archive.includes(Buffer.from(repositoryRoot))).toBe(false);
     expect(await readdir(destinationDirectory)).toEqual([
-      'vscode-mcp-server-1.0.1.tar.gz',
+      'vscode-mcp-server-1.1.0.tar.gz',
     ]);
   });
 });
@@ -324,7 +324,7 @@ describe('release metadata', () => {
         { file: 'a.txt', mediaType: 'text/plain', role: 'test', sha256: 'a', size: 2 },
       ],
       nodeEngine: '^22.13.0',
-      version: '1.0.1',
+      version: '1.1.0',
       vscodeEngine: '^1.101.0',
     });
     expect(manifest.artifacts.map((artifact) => artifact.file)).toEqual([
@@ -394,7 +394,7 @@ describe('release metadata', () => {
     const root = await temporaryDirectory();
     await writeValidReleaseDirectory(root);
 
-    const vsixPath = path.join(root, 'vscode-mcp-extension-1.0.1.vsix');
+    const vsixPath = path.join(root, 'vscode-mcp-extension-1.1.0.vsix');
     const vsixEntries = readZipEntries(await readFile(vsixPath));
     const extensionPackage = vsixEntries.find(
       ({ name }) => name === 'extension/package.json',
@@ -408,7 +408,7 @@ describe('release metadata', () => {
     );
 
     await writeValidReleaseDirectory(root);
-    const serverPath = path.join(root, 'vscode-mcp-server-1.0.1.tar.gz');
+    const serverPath = path.join(root, 'vscode-mcp-server-1.1.0.tar.gz');
     const serverEntries = inspectTarGzip(await readFile(serverPath));
     const serverStage = path.join(root, '.tampered-server', 'vscode-mcp-server');
     await mkdir(serverStage, { recursive: true });
@@ -443,7 +443,7 @@ describe('release metadata', () => {
   it('rejects a malformed Marketplace icon inside a checksummed VSIX', async () => {
     const root = await temporaryDirectory();
     await writeValidReleaseDirectory(root);
-    const vsixPath = path.join(root, 'vscode-mcp-extension-1.0.1.vsix');
+    const vsixPath = path.join(root, 'vscode-mcp-extension-1.1.0.vsix');
     const entries = readZipEntries(await readFile(vsixPath));
     const icon = entries.find(({ name }) => name === 'extension/images/icon.png');
     icon.contents = Buffer.from('not-a-png');
@@ -457,7 +457,7 @@ describe('release metadata', () => {
   it('rejects a tampered bundled setup server inside a checksummed VSIX', async () => {
     const root = await temporaryDirectory();
     await writeValidReleaseDirectory(root);
-    const vsixPath = path.join(root, 'vscode-mcp-extension-1.0.1.vsix');
+    const vsixPath = path.join(root, 'vscode-mcp-extension-1.1.0.vsix');
     const entries = readZipEntries(await readFile(vsixPath));
     const server = entries.find(({ name }) => name === 'extension/server/cli.mjs');
     server.contents = Buffer.from('tampered');
@@ -471,14 +471,14 @@ describe('release metadata', () => {
   it('reads active VSIX XML structure and ignores metadata hidden in comments', async () => {
     const root = await temporaryDirectory();
     await writeValidReleaseDirectory(root);
-    const vsixPath = path.join(root, 'vscode-mcp-extension-1.0.1.vsix');
+    const vsixPath = path.join(root, 'vscode-mcp-extension-1.1.0.vsix');
     const entries = readZipEntries(await readFile(vsixPath));
     const manifest = entries.find(({ name }) => name === 'extension.vsixmanifest');
     const source = manifest.contents.toString('utf8');
     manifest.contents = Buffer.from(
       source.replace(
-        '<Identity Language="en-US" Id="vscode-mcp" Version="1.0.1" Publisher="vscode-mcp"/>',
-        '<!-- <Identity Language="en-US" Id="vscode-mcp" Version="1.0.1" Publisher="vscode-mcp"/> --><Identity Language="en-US" Id="vscode-mcp" Version="1.0.1" Publisher="attacker"/>',
+        '<Identity Language="en-US" Id="vscode-mcp" Version="1.1.0" Publisher="vscode-mcp"/>',
+        '<!-- <Identity Language="en-US" Id="vscode-mcp" Version="1.1.0" Publisher="vscode-mcp"/> --><Identity Language="en-US" Id="vscode-mcp" Version="1.1.0" Publisher="attacker"/>',
       ),
     );
     await replaceReleaseArtifact(root, vsixPath, buildDeterministicZip(entries));
@@ -491,7 +491,7 @@ describe('release metadata', () => {
   it('rejects a checksummed SBOM whose dependency graph is incomplete', async () => {
     const root = await temporaryDirectory();
     await writeValidReleaseDirectory(root);
-    const sbomFileName = 'vscode-mcp-1.0.1.cdx.json';
+    const sbomFileName = 'vscode-mcp-1.1.0.cdx.json';
     const sbomPath = path.join(root, sbomFileName);
     const sbom = JSON.parse(await readFile(sbomPath, 'utf8'));
     sbom.dependencies = [];
@@ -514,16 +514,16 @@ describe('release metadata', () => {
   it('rejects SBOM components disconnected from the release root', async () => {
     const root = await temporaryDirectory();
     await writeValidReleaseDirectory(root);
-    const sbomFileName = 'vscode-mcp-1.0.1.cdx.json';
+    const sbomFileName = 'vscode-mcp-1.1.0.cdx.json';
     const sbomPath = path.join(root, sbomFileName);
     const sbom = JSON.parse(await readFile(sbomPath, 'utf8'));
-    const disconnectedRef = 'pkg:npm/disconnected@1.0.1';
+    const disconnectedRef = 'pkg:npm/disconnected@1.1.0';
     sbom.components.push({
       ...sbom.components[0],
       'bom-ref': disconnectedRef,
       name: 'disconnected',
       purl: disconnectedRef,
-      version: '1.0.1',
+      version: '1.1.0',
     });
     sbom.dependencies.push({ dependsOn: [], ref: disconnectedRef });
     const contents = Buffer.from(serializeJson(sbom));
@@ -559,11 +559,11 @@ describe('release metadata', () => {
     const graph = {
       components: new Map([[component.bomRef, component]]),
       dependencies: new Map([
-        ['pkg:generic/vscode-mcp-release@1.0.1', new Set([component.bomRef])],
+        ['pkg:generic/vscode-mcp-release@1.1.0', new Set([component.bomRef])],
         [component.bomRef, new Set()],
       ]),
-      rootRef: 'pkg:generic/vscode-mcp-release@1.0.1',
-      version: '1.0.1',
+      rootRef: 'pkg:generic/vscode-mcp-release@1.1.0',
+      version: '1.1.0',
     };
 
     const first = serializeJson(createCycloneDxBom(graph));
@@ -594,7 +594,7 @@ describe('release metadata', () => {
     const notices = await createThirdPartyNotices({
       components: new Map([[component.bomRef, component]]),
       dependencies: new Map([[component.bomRef, new Set()]]),
-      version: '1.0.1',
+      version: '1.1.0',
     });
 
     expect(notices).toContain('Example license text');
@@ -637,7 +637,7 @@ async function writeValidReleaseDirectory(root) {
     version: '4.4.3',
     workspace: false,
   };
-  const rootRef = 'pkg:generic/vscode-mcp-release@1.0.1';
+  const rootRef = 'pkg:generic/vscode-mcp-release@1.1.0';
   const sbom = serializeJson(
     createCycloneDxBom({
       components: new Map([[component.bomRef, component]]),
@@ -646,7 +646,7 @@ async function writeValidReleaseDirectory(root) {
         [component.bomRef, new Set()],
       ]),
       rootRef,
-      version: '1.0.1',
+      version: '1.1.0',
     }),
   );
   const vsix = buildDeterministicZip([
@@ -661,7 +661,7 @@ async function writeValidReleaseDirectory(root) {
       name: 'extension.vsixmanifest',
       mode: 0o644,
       contents: Buffer.from(
-        '<PackageManifest><Metadata><Identity Language="en-US" Id="vscode-mcp" Version="1.0.1" Publisher="vscode-mcp"/><Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.101.0" /></Properties></Metadata><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" /></Assets></PackageManifest>\n',
+        '<PackageManifest><Metadata><Identity Language="en-US" Id="vscode-mcp" Version="1.1.0" Publisher="vscode-mcp"/><Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.101.0" /></Properties></Metadata><Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" /></Assets></PackageManifest>\n',
       ),
     },
     {
@@ -679,18 +679,18 @@ async function writeValidReleaseDirectory(root) {
       ['extension/SUPPORT.md', 'support\n'],
       ['extension/THIRD_PARTY_NOTICES.md', 'third party\n'],
       ['extension/changelog.md', 'changelog\n'],
-      ['extension/dist/extension.js', '(()=>{"vscode-mcp":"1.0.1"})();\n'],
-      ['extension/server/cli.mjs', '#!/usr/bin/env node\nconst version="1.0.1";\n'],
+      ['extension/dist/extension.js', '(()=>{"vscode-mcp":"1.1.0"})();\n'],
+      ['extension/server/cli.mjs', '#!/usr/bin/env node\nconst version="1.1.0";\n'],
       [
         'extension/server/manifest.json',
         serializeJson({
           schemaVersion: 1,
-          productVersion: '1.0.1',
+          productVersion: '1.1.0',
           nodeEngine: '^22.13.0',
           cli: {
             file: 'cli.mjs',
             sha256: sha256Buffer(
-              Buffer.from('#!/usr/bin/env node\nconst version="1.0.1";\n'),
+              Buffer.from('#!/usr/bin/env node\nconst version="1.1.0";\n'),
             ),
           },
         }),
@@ -700,7 +700,7 @@ async function writeValidReleaseDirectory(root) {
         serializeJson({
           name: 'vscode-mcp',
           publisher: 'vscode-mcp',
-          version: '1.0.1',
+          version: '1.1.0',
           private: true,
           type: 'commonjs',
           main: './dist/extension.js',
@@ -752,12 +752,12 @@ async function writeValidReleaseDirectory(root) {
     ['SUPPORT.md', 'support\n'],
     ['THIRD_PARTY_NOTICES.md', 'third party\n'],
     ['TOOL_CONTRACT.md', 'tool contract\n'],
-    ['cli.mjs', '#!/usr/bin/env node\nconst version="1.0.1";\n'],
+    ['cli.mjs', '#!/usr/bin/env node\nconst version="1.1.0";\n'],
     [
       'package.json',
       serializeJson({
         name: '@vscode-mcp/server',
-        version: '1.0.1',
+        version: '1.1.0',
         private: true,
         type: 'module',
         engines: { node: '^22.13.0' },
@@ -773,9 +773,9 @@ async function writeValidReleaseDirectory(root) {
   );
   await rm(path.join(root, '.server-fixture'), { force: true, recursive: true });
   const specifications = [
-    ['vscode-mcp-extension-1.0.1.vsix', 'extension', 'application/vsix', vsix],
-    ['vscode-mcp-server-1.0.1.tar.gz', 'server', 'application/gzip', server],
-    ['vscode-mcp-1.0.1.cdx.json', 'sbom', 'application/vnd.cyclonedx+json', sbom],
+    ['vscode-mcp-extension-1.1.0.vsix', 'extension', 'application/vsix', vsix],
+    ['vscode-mcp-server-1.1.0.tar.gz', 'server', 'application/gzip', server],
+    ['vscode-mcp-1.1.0.cdx.json', 'sbom', 'application/vnd.cyclonedx+json', sbom],
     ['README.md', 'documentation', 'text/markdown', 'readme\n'],
     ['INSTALLATION.md', 'documentation', 'text/markdown', 'install\n'],
     ['AGENT_USAGE.md', 'documentation', 'text/markdown', 'agent guide\n'],
@@ -806,7 +806,7 @@ async function writeValidReleaseDirectory(root) {
       createReleaseManifest({
         artifacts,
         nodeEngine: '^22.13.0',
-        version: '1.0.1',
+        version: '1.1.0',
         vscodeEngine: '^1.101.0',
       }),
     ),

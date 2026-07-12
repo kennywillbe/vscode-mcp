@@ -25,18 +25,19 @@ booleans and non-secret change identifiers.
 
 ## Mutation threats and controls
 
-| Threat                                    | Control                                                                                                                                                    |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Path escape, symlink swap, case confusion | Canonical deepest-root authorization, non-following descriptor checks where filesystem access is direct, and immediate pre-commit revalidation.            |
-| Stale agent plan                          | Required expected versions, provider version snapshots, final synchronous recheck.                                                                         |
-| Overlapping or malformed edits            | UTF-16 range validation against exact snapshots; deterministic sort; overlap rejection.                                                                    |
-| Partial text mutation                     | One text-only `WorkspaceEdit`; no asynchronous yield after final checks.                                                                                   |
-| Provider command smuggling                | Fixed provider command IDs in code; returned commands rejected; no arbitrary execute-command tool.                                                         |
-| Opaque rename/resource operation          | Require `WorkspaceEdit.size === entries().length`, then discard the provider edit and reconstruct a text-only edit; mismatch fails `OPAQUE_PROVIDER_EDIT`. |
-| Overwrite or recursive deletion           | No overwrite flags, no directory operations, explicit absent/existing checks.                                                                              |
-| Secret leakage                            | No source/replacement content, absolute paths, task commands, environment, preview secrets, or payload logs.                                               |
-| Replay                                    | Listener/grant/version-bound single-use previews with TTL and constant-time secret comparison.                                                             |
-| Cancellation race                         | Cancellation prevents pre-commit action; post-commit response reports reality and never promises rollback.                                                 |
+| Threat                                     | Control                                                                                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Path escape, symlink swap, case confusion  | Canonical deepest-root authorization, non-following descriptor checks where filesystem access is direct, and immediate pre-commit revalidation.                                |
+| Stale agent plan                           | Required expected versions, provider version snapshots, final synchronous recheck.                                                                                             |
+| Overlapping or malformed edits             | UTF-16 range validation against exact snapshots; deterministic sort; overlap rejection.                                                                                        |
+| Partial text mutation                      | One text-only `WorkspaceEdit`; no asynchronous yield after final checks.                                                                                                       |
+| Provider command smuggling                 | Fixed provider command IDs in code; returned commands rejected; no arbitrary execute-command tool.                                                                             |
+| Opaque rename/resource operation           | Require `WorkspaceEdit.size === entries().length`, then discard the provider edit and reconstruct a text-only edit; mismatch fails `OPAQUE_PROVIDER_EDIT`.                     |
+| Overwrite or recursive deletion            | No overwrite flags, no directory operations, explicit absent/existing checks.                                                                                                  |
+| Secret leakage                             | No source/replacement content, absolute paths, task commands, environment, preview secrets, or payload logs.                                                                   |
+| Replay                                     | Listener/grant/version-bound single-use previews with TTL and constant-time secret comparison.                                                                                 |
+| Cancellation race                          | Cancellation prevents pre-commit action; post-commit response reports reality and never promises rollback.                                                                     |
+| Visual attribution leakage or stale claims | Store only bounded URI/tool/kind/range metadata in memory; never source/replacement text; clear a file on later text change and clear the session on authority/lifecycle loss. |
 
 ## Execution threats and controls
 
@@ -73,6 +74,12 @@ shutdown, write revocation, and execution revocation are authority transitions. 
 transition increments/destroys the relevant generation state before awaiting cleanup so
 new work observes revocation immediately.
 
+Transient registry heartbeat publication failures receive three bounded attempts while
+the same listener and eligibility remain current. Persistent failure still withdraws the
+listener. A bridge may suggest one uniquely authenticated same-workspace replacement
+instance from a bounded 60-second memory-only cache, but it never redirects a call or
+transfers write/execution authority.
+
 ## Logging and persistence
 
 Allowed logs: tool name, safe stable outcome code, duration, aggregate item/byte counts,
@@ -83,6 +90,14 @@ queries, task/debug names when user-authored, task definitions, commands, argume
 environment, provider bodies, preview/task IDs, grant material, endpoints, tokens, or
 full requests/responses. No content index, edit preview, or execution history persists
 across the listener generation.
+
+Visual change attribution is extension-local UI. It retains at most 200 file records and
+4,096 range markers for the current listener generation. Immutable before-snapshots are
+limited to 2 MiB each and 32 MiB in aggregate, exist only as in-memory virtual
+documents, and are never logged, transferred over the network, written to disk, or
+returned over MCP. Rendering and diff publication occur only after a successful mutation
+commit and cannot alter the tool outcome. Manual follow-up edits, write revocation, and
+listener disposal clear the applicable snapshots immediately.
 
 ## Client setup boundary
 

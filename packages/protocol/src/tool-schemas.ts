@@ -638,6 +638,7 @@ export const GetDocumentSymbolsResultSchema = z
   .object({
     document: DocumentSnapshotSchema,
     providerShape: z.enum(['hierarchical', 'flat']),
+    providerReportedNestedSymbols: z.boolean(),
     symbols: z.array(DocumentSymbolSchema).max(TOOL_LIMITS.documentSymbols.itemsMax),
   })
   .strict()

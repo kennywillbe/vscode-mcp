@@ -94,6 +94,21 @@ describe('WorkspaceTextSearchService', () => {
     ]);
   });
 
+  it('treats leading and trailing query whitespace as literal text', async () => {
+    const host = new FakeSearchHost();
+    host.addFile('/workspace/spaces.txt', 'x padded y\nxpaddedy');
+    const result = await createService(host).searchWorkspaceText(
+      { workspaceFolderId: 'root', query: ' padded ' },
+      new AbortController().signal,
+    );
+
+    expect(result.result.returnedMatchCount).toBe(1);
+    expect(result.result.documents[0]?.matches[0]?.range).toEqual({
+      start: { line: 0, character: 1 },
+      end: { line: 0, character: 9 },
+    });
+  });
+
   it('prefers an authorized dirty live document over stale disk bytes', async () => {
     const host = new FakeSearchHost();
     host.addFile('/workspace/live.ts', 'DISK_ONLY');

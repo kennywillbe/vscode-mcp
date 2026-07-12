@@ -218,6 +218,7 @@ describe('serialized extension output hardening', () => {
       result: {
         document: document(),
         providerShape: 'flat',
+        providerReportedNestedSymbols: false,
         symbols: Array.from({ length: 100 }, (_, index) => ({
           id: `s${index}`,
           parentId: null,
@@ -398,7 +399,12 @@ function minimalPayloads(): ExtensionToolResultPayload[] {
     },
     {
       tool: 'get_document_symbols',
-      result: { document: document(), providerShape: 'flat', symbols: [] },
+      result: {
+        document: document(),
+        providerShape: 'flat',
+        providerReportedNestedSymbols: false,
+        symbols: [],
+      },
     },
     {
       tool: 'search_workspace_symbols',

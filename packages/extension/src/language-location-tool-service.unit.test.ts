@@ -551,6 +551,7 @@ describe('LanguageLocationToolService', () => {
         tool: 'get_document_symbols',
         result: {
           providerShape: 'hierarchical',
+          providerReportedNestedSymbols: true,
           symbols: [
             { id: 's0', parentId: null, name: 'A' },
             { id: 's1', parentId: 's0', name: 'method', deprecated: true },
@@ -594,7 +595,11 @@ describe('LanguageLocationToolService', () => {
       outcome: 'success',
       payload: {
         tool: 'get_document_symbols',
-        result: { providerShape: 'flat', symbols: [{ name: 'inside' }] },
+        result: {
+          providerShape: 'flat',
+          providerReportedNestedSymbols: false,
+          symbols: [{ name: 'inside' }],
+        },
       },
     });
     expect(JSON.stringify(documentResponse)).not.toContain('external-secret');

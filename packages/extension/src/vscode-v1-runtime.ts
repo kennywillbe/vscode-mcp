@@ -8,6 +8,10 @@ import type { CapabilityGrantController } from './capability-grant-controller.js
 import type { ExtensionToolRouter } from './extension-tool-router.js';
 import { VsCodeV02ReadRuntime } from './vscode-v0.2-read-runtime.js';
 import { VsCodeV1IdeToolService } from './vscode-v1-ide-tool-service.js';
+import {
+  VisualChangeController,
+  type VisualChangeSummary,
+} from './visual-change-controller.js';
 
 interface Options {
   readonly instanceId: string;
@@ -21,6 +25,7 @@ export class VsCodeV1Runtime {
   readonly #reads: VsCodeV02ReadRuntime;
   readonly #readRouter;
   readonly #ide: VsCodeV1IdeToolService;
+  readonly #visualChanges = new VisualChangeController();
 
   public constructor(options: Options) {
     this.#reads = new VsCodeV02ReadRuntime({
@@ -31,6 +36,7 @@ export class VsCodeV1Runtime {
     this.#ide = new VsCodeV1IdeToolService({
       grants: options.grants,
       isWorkspaceEnabled: options.isWorkspaceEnabled,
+      visualChanges: this.#visualChanges,
     });
   }
 
@@ -45,11 +51,33 @@ export class VsCodeV1Runtime {
 
   public dispose(): void {
     this.#ide.dispose();
+    this.#visualChanges.dispose();
     this.#reads.destroy();
   }
 
   public handleCapabilityRevoked(capability: 'write' | 'execution'): void {
     this.#ide.handleCapabilityRevoked(capability);
+    if (capability === 'write') this.#visualChanges.clearAll();
+  }
+
+  public reviewChanges(): Promise<void> {
+    return this.#visualChanges.reviewChanges();
+  }
+
+  public nextChange(direction: 1 | -1): Promise<void> {
+    return this.#visualChanges.nextChange(direction);
+  }
+
+  public clearChangeHighlights(): void {
+    this.#visualChanges.clearAll();
+  }
+
+  public clearCurrentFileChangeHighlights(): void {
+    this.#visualChanges.clearActiveFile();
+  }
+
+  public visualChangeSummary(): VisualChangeSummary {
+    return this.#visualChanges.summary();
   }
 }
 

@@ -90,6 +90,16 @@ Code provider command. Inputs never contain a command identifier. Results:
 - expose explicit truncation and bounded warning counts; and
 - recheck the document version after asynchronous provider work.
 
+`get_document_symbols` reports both the provider shape and
+`providerReportedNestedSymbols`. The latter is true only when the provider returned at
+least one explicit parent/child relationship; false means callers may need targeted
+reads or searches because the extension does not invent members that the provider
+omitted.
+
+`search_workspace_text` treats its query as exact literal text, including leading and
+trailing whitespace. `contextLines` is restricted to 0–2 in both runtime validation and
+the advertised MCP JSON Schema.
+
 Completions return labels, kinds, sort/filter text, bounded documentation, replacement
 ranges, and insert text but never execute completion commands. Code actions return
 bounded previews. Only fully inspectable text-edit-only actions receive an opaque,
@@ -115,6 +125,15 @@ ordinary dirty-buffer behavior. VS Code may still persist non-visible resources 
 multi-resource `workspace.applyEdit`; callers must use each returned `isDirty` value
 instead of assuming either saved or unsaved state. `revert_documents` restores the
 current saved bytes of dirty documents and is not an undo/history service.
+
+Successful content mutations also produce extension-local visual attribution. The
+extension derives exact post-edit UTF-16 ranges from the validated edit plan and renders
+added, modified, and deletion markers without adding fields to MCP results. Visual
+records are bounded to 200 files / 4,096 markers, contain no source or replacement text,
+while optional before-snapshots are capped at 2 MiB each / 32 MiB total. Both metadata
+and snapshots remain memory-only for the listener generation, never cross MCP, and never
+affect commit success. A subsequent non-MCP edit clears the affected file's attribution
+rather than retaining a stale range.
 
 ## File operations
 
@@ -155,8 +174,11 @@ Code-action preview tokens:
 
 `list_tasks` exposes at most 200 tasks from `tasks.fetchTasks`, restricted to the
 selected workspace/folder. Safe metadata includes opaque listener-scoped task ID, name,
-source, group, background flag, and problem-matcher count. It never returns
-shell/process commands, arguments, environment variables, or absolute paths.
+source, an allowlisted `runner` (`npm`, `yarn`, `pnpm`, `bun`, `node`, or `vp`) when the
+VS Code task exposes an inspectable process or structured shell command, group,
+background flag, and problem-matcher count. Unknown, custom, or full-command-line
+executions report `runner: null`. It never returns shell/process commands, arguments,
+environment variables, or absolute paths.
 
 `run_task` executes only one currently rediscovered task matching an opaque ID and an
 active execution grant. At most four MCP-started task executions may be tracked per

@@ -426,6 +426,7 @@ export class LanguageLocationToolService implements LanguageLocationToolProvider
     const result = GetDocumentSymbolsResultSchema.parse({
       document: createDocumentSnapshot(requested.hostDocument, requested.authorization),
       providerShape,
+      providerReportedNestedSymbols: symbols.some((symbol) => symbol.parentId !== null),
       symbols: bounded,
     });
     return success('get_document_symbols', result, warnings, this.#now);

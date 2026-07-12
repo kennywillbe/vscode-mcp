@@ -27,11 +27,32 @@ manual installations. See the complete
   folds, selections, and document links through VS Code providers.
 - Version-checked multi-document edits, create/move/delete, save/revert, rename,
   formatting, and inspectable text-edit-only code actions.
+- Theme-aware added/modified/deleted highlights, overview-ruler markers, Explorer
+  badges, single-file and multi-file diff review, and next/previous navigation for
+  MCP-authored changes.
 - Configured VS Code tasks and exact named run/debug configurations.
 
 Read access is enabled per trusted workspace. Write and task/debug execution are
 separate visible, memory-only session grants that default to off and are independently
 revocable.
+
+## Review MCP changes
+
+Every successful content mutation is attributed visually:
+
+- green marks added text, blue marks replacements, and red marks deletion anchors;
+- the overview ruler and Explorer A/M badges show affected locations and files;
+- click **MCP: _n_ changed** to open one side-by-side diff or a single multi-file
+  changes editor when several files were changed;
+- run **VS Code MCP: Go to Next Highlighted Change** or **Go to Previous Highlighted
+  Change** to navigate exact ranges; and
+- clear the active file or the complete session with the matching **Clear Change
+  Highlights** commands.
+
+The `vscodeMcp.changeHighlights` settings control rendering, Explorer badges, and the
+status item. Metadata and before-snapshots are bounded, memory-only, and never written
+to disk or returned over MCP. Manual edits clear attribution for the affected file so
+stale ranges are never presented as MCP-authored.
 
 There is no generic shell, terminal input, Git control, arbitrary VS Code command,
 debug-console evaluation, arbitrary DAP request, telemetry, or network listener.

@@ -110,6 +110,22 @@ describe('MCP SDK adapter', () => {
           });
         }
       }
+      const textSearch = tools.tools.find(
+        (tool) => tool.name === 'search_workspace_text',
+      );
+      expect(textSearch?.inputSchema).toMatchObject({
+        properties: {
+          query: {
+            description: expect.stringContaining(
+              'Leading and trailing whitespace are significant',
+            ),
+          },
+          contextLines: {
+            maximum: 2,
+            description: expect.stringContaining('maximum 2'),
+          },
+        },
+      });
 
       const response = await client.callTool({
         name: 'list_instances',
@@ -338,6 +354,36 @@ describe('MCP SDK adapter', () => {
             text: expect.stringContaining('PROVIDER_UNAVAILABLE'),
           },
         ],
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it('preserves a safe replacement instance hint in the public Failure envelope', async () => {
+    const replacementInstanceId = '00000000-0000-4000-8000-000000000002';
+    const gateway = new TestGateway(async () => ({
+      status: 'failed',
+      error: {
+        code: 'INSTANCE_NOT_FOUND',
+        message: 'No eligible VS Code instance matches this request.',
+        retryable: true,
+        details: { replacementInstanceId },
+      },
+    }));
+    const { client, close } = await connected(gateway);
+    try {
+      const response = await client.callTool({
+        name: 'get_editor_context',
+        arguments: { instanceId: INSTANCE_ID },
+      });
+
+      expect(response.isError).toBe(true);
+      expect(response.structuredContent).toMatchObject({
+        error: {
+          code: 'INSTANCE_NOT_FOUND',
+          details: { replacementInstanceId },
+        },
       });
     } finally {
       await close();

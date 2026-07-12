@@ -249,13 +249,15 @@ export const V02ReadDocumentsInputSchema =
 const SearchQuerySchema = z
   .string()
   .min(1)
-  .refine((value) => value === value.trim(), 'Query must already be trimmed.')
   .refine((value) => !value.includes('\0'), 'Query cannot contain NUL.')
   .refine(
     (value) =>
       Array.from(value).length <=
       V02_READ_TOOL_LIMITS.searchWorkspaceText.queryScalarsMax,
     `Query must not exceed ${V02_READ_TOOL_LIMITS.searchWorkspaceText.queryScalarsMax} Unicode scalar values.`,
+  )
+  .describe(
+    `Literal search text. Leading and trailing whitespace are significant. Maximum ${V02_READ_TOOL_LIMITS.searchWorkspaceText.queryScalarsMax} Unicode scalar values; NUL is forbidden.`,
   );
 
 export const V02SearchWorkspaceTextArgumentsSchema = z
@@ -270,6 +272,9 @@ export const V02SearchWorkspaceTextArgumentsSchema = z
       .int()
       .nonnegative()
       .max(V02_READ_TOOL_LIMITS.searchWorkspaceText.contextLinesMax)
+      .describe(
+        `Number of context lines returned before and after each match; maximum ${V02_READ_TOOL_LIMITS.searchWorkspaceText.contextLinesMax}.`,
+      )
       .optional(),
     limit: limitSchema(V02_READ_TOOL_LIMITS.searchWorkspaceText.matchesMax).optional(),
     cursor: CursorSchema.optional(),

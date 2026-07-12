@@ -61,6 +61,14 @@ Ask the user to run **VS Code MCP: Enable Writes for This Session**. Then:
    `workspace.applyEdit`; call `save_documents` for remaining dirty buffers and do not
    treat `revert_documents` as a history/undo mechanism.
 
+The user can review successful mutations directly in VS Code through inline
+added/modified/deleted highlights, overview-ruler marks, Explorer badges, and the
+clickable **MCP: _n_ changed** status item. The next/previous commands navigate exact
+post-edit ranges; clicking the status item opens a side-by-side diff or a multi-file
+changes editor for the listener session. Agents should still reread versions and
+diagnostics; visual attribution is local review UX, not proof that later user edits
+preserved the same content.
+
 Use `create_workspace_file` only for a missing file under an existing parent. It never
 overwrites or creates parent directories. Move and delete accept regular non-symlink
 files only; directories and recursive deletion are unavailable.
@@ -76,8 +84,11 @@ Ask the user to run **VS Code MCP: Enable Task and Debug Execution for This Sess
 Refresh `list_instances` afterward for the same listener-rotation reason as write
 enablement.
 
-- `list_tasks` returns opaque IDs and safe metadata for configured VS Code tasks. It
-  deliberately omits commands, arguments, environment variables, and absolute paths.
+- `list_tasks` returns opaque IDs and safe metadata for configured VS Code tasks. Its
+  allowlisted `runner` distinguishes package-script runtimes such as Bun or pnpm even
+  when VS Code reports `source: npm`; `runner: null` means the execution is not safely
+  classifiable. It deliberately omits commands, arguments, environment variables, and
+  absolute paths.
 - Pass an ID from the latest list to `run_task`, then poll `get_task_execution` until it
   ends. Inspect returned workspace diagnostics. `terminate_task` affects only a task
   started by this listener generation.
@@ -100,8 +111,11 @@ authority and listener-scoped IDs.
   visible session grant; never loop.
 - `WRITE_GRANT_CHANGED` / `EXECUTION_GRANT_CHANGED`: stop and re-orient because
   authority changed mid-flight.
-- `INSTANCE_NOT_FOUND` / `INSTANCE_DISCONNECTED`: call `list_instances` again; a reload,
-  workspace change, or disable may have rotated the instance ID.
+- `INSTANCE_NOT_FOUND` / `INSTANCE_DISCONNECTED`: if the error contains a
+  `replacementInstanceId`, use it only to rediscover/reselect the same workspace and
+  re-check capability status; write and execution grants do not carry across listener
+  restarts. Otherwise call `list_instances` again. A reload, workspace change, or
+  disable may have rotated the instance ID.
 - `RESULTS_TRUNCATED`: consume the tool's cursor or narrow the query. Never infer that
   omitted data does not exist.
 - `OPAQUE_PROVIDER_EDIT`: use direct version-checked text edits or split file movement

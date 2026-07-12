@@ -191,7 +191,7 @@ describe('v0.2 read inputs', () => {
     ).toBe(false);
   });
 
-  it('enforces literal query scalar and NUL rules', () => {
+  it('enforces literal query scalar and NUL rules while preserving whitespace', () => {
     expect(
       V02SearchWorkspaceTextInputSchema.safeParse({
         workspaceFolderId,
@@ -204,9 +204,14 @@ describe('v0.2 read inputs', () => {
         query: '😀'.repeat(V02_READ_TOOL_LIMITS.searchWorkspaceText.queryScalarsMax),
       }).success,
     ).toBe(true);
+    expect(
+      V02SearchWorkspaceTextInputSchema.safeParse({
+        workspaceFolderId,
+        query: ' padded ',
+      }).success,
+    ).toBe(true);
     for (const query of [
       '',
-      ' padded ',
       'contains\0nul',
       'a'.repeat(V02_READ_TOOL_LIMITS.searchWorkspaceText.queryScalarsMax + 1),
     ]) {

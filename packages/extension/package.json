@@ -1,7 +1,7 @@
 {
   "name": "vscode-mcp",
   "displayName": "VS Code MCP",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "publisher": "vscode-mcp",
   "description": "Secure local MCP access to VS Code IDE capabilities for coding agents.",
@@ -53,7 +53,12 @@
     "onCommand:vscode-mcp.showStatus",
     "onCommand:vscode-mcp.setupClient",
     "onCommand:vscode-mcp.repairClient",
-    "onCommand:vscode-mcp.removeClient"
+    "onCommand:vscode-mcp.removeClient",
+    "onCommand:vscode-mcp.reviewChanges",
+    "onCommand:vscode-mcp.nextChange",
+    "onCommand:vscode-mcp.previousChange",
+    "onCommand:vscode-mcp.clearChangeHighlights",
+    "onCommand:vscode-mcp.clearCurrentFileChangeHighlights"
   ],
   "main": "./dist/extension.js",
   "capabilities": {
@@ -116,6 +121,147 @@
         "command": "vscode-mcp.removeClient",
         "title": "Remove MCP Client Integration",
         "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.reviewChanges",
+        "title": "Review Highlighted Changes",
+        "category": "VS Code MCP",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "vscode-mcp.nextChange",
+        "title": "Go to Next Highlighted Change",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.previousChange",
+        "title": "Go to Previous Highlighted Change",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.clearChangeHighlights",
+        "title": "Clear All Change Highlights",
+        "category": "VS Code MCP"
+      },
+      {
+        "command": "vscode-mcp.clearCurrentFileChangeHighlights",
+        "title": "Clear Change Highlights for Current File",
+        "category": "VS Code MCP"
+      }
+    ],
+    "configuration": {
+      "title": "VS Code MCP",
+      "properties": {
+        "vscodeMcp.changeHighlights.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show session-scoped inline, gutter, and overview-ruler highlights for content changed through VS Code MCP."
+        },
+        "vscodeMcp.changeHighlights.showExplorerBadges": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show A/M badges for files created or changed through VS Code MCP in the Explorer."
+        },
+        "vscodeMcp.changeHighlights.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show a clickable status-bar summary while VS Code MCP change highlights exist."
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "vscodeMcp.changeHighlight.addedBackground",
+        "description": "Background for content added through VS Code MCP.",
+        "defaults": {
+          "dark": "#2EA04333",
+          "light": "#2DA44E26",
+          "highContrast": "#2EA04355"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.addedBorder",
+        "description": "Border and Explorer badge color for content added through VS Code MCP.",
+        "defaults": {
+          "dark": "#3FB950",
+          "light": "#1A7F37",
+          "highContrast": "#7EE787"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.addedOverviewRuler",
+        "description": "Overview-ruler marker for content added through VS Code MCP.",
+        "defaults": {
+          "dark": "#3FB950CC",
+          "light": "#1A7F37CC",
+          "highContrast": "#7EE787"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.modifiedBackground",
+        "description": "Background for content modified through VS Code MCP.",
+        "defaults": {
+          "dark": "#388BFD33",
+          "light": "#0969DA22",
+          "highContrast": "#58A6FF55"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.modifiedBorder",
+        "description": "Border and Explorer badge color for content modified through VS Code MCP.",
+        "defaults": {
+          "dark": "#58A6FF",
+          "light": "#0969DA",
+          "highContrast": "#79C0FF"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.modifiedOverviewRuler",
+        "description": "Overview-ruler marker for content modified through VS Code MCP.",
+        "defaults": {
+          "dark": "#58A6FFCC",
+          "light": "#0969DACC",
+          "highContrast": "#79C0FF"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.deletedBackground",
+        "description": "Whole-line background at content deleted through VS Code MCP.",
+        "defaults": {
+          "dark": "#F8514933",
+          "light": "#CF222E22",
+          "highContrast": "#FF7B7255"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.deletedBorder",
+        "description": "Marker color for content deleted through VS Code MCP.",
+        "defaults": {
+          "dark": "#FF7B72",
+          "light": "#CF222E",
+          "highContrast": "#FFA198"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.deletedOverviewRuler",
+        "description": "Overview-ruler marker for content deleted through VS Code MCP.",
+        "defaults": {
+          "dark": "#FF7B72CC",
+          "light": "#CF222ECC",
+          "highContrast": "#FFA198"
+        }
+      },
+      {
+        "id": "vscodeMcp.changeHighlight.fileOperationBackground",
+        "description": "Whole-line background for file operations performed through VS Code MCP.",
+        "defaults": {
+          "dark": "#A371F733",
+          "light": "#8250DF22",
+          "highContrast": "#D2A8FF55"
+        }
       }
     ]
   },

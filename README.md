@@ -6,9 +6,9 @@ intelligence, version-checked edits and file operations, configured tasks, and n
 run/debug configurations without adding a generic shell, terminal, Git controller, or
 network service.
 
-> [!IMPORTANT] Version 1.0.0 is available from GitHub Releases and the VS Code
-> Marketplace. Version 1.0.1 contains the listener-startup lifecycle fix. Windows is
-> deferred and fails closed before listener or registry publication.
+> [!IMPORTANT] Version 1.0.1 is available from GitHub Releases and the VS Code
+> Marketplace. Version 1.1.0 adds agent-oriented change review and workflow fidelity.
+> Windows is deferred and fails closed before listener or registry publication.
 
 ## Quick install
 
@@ -75,6 +75,16 @@ The exact schemas, limits, errors, and all tool names are in the
 build/test execution boundary; named launch configurations are the run/debug boundary.
 The project intentionally has no arbitrary shell string, terminal input, Git control,
 arbitrary `executeCommand`, debug-console evaluation, or DAP custom-request tool.
+
+Successful MCP mutations are visible in VS Code immediately. Added text is highlighted
+in green, modified text in blue, and deletion anchors in red, with matching overview
+ruler markers and Explorer badges. The separate **MCP: _n_ changed** status item opens a
+side-by-side diff for one file or a single multi-file changes editor for the complete
+session, matching VS Code's commit-review workflow. **VS Code MCP: Go to Next/Previous
+Highlighted Change** navigates exact post-edit ranges; per-file and session-wide clear
+commands remove the decorations. The visual metadata and before-snapshots are bounded,
+memory-only, and listener-scoped. They are cleared on manual follow-up edits, write
+revocation, workspace disable, listener restart, or reload.
 
 Read access is enabled per trusted canonical workspace. Write and execution authority
 are separate, off by default, memory-only grants. Use **VS Code MCP: Enable Writes for
@@ -166,7 +176,7 @@ Create a local, unpublished development VSIX with:
 pnpm package:vsix
 ```
 
-After every release gate is complete and all package versions are `1.0.1`, create the
+After every release gate is complete and all package versions are `1.1.0`, create the
 complete local candidate with:
 
 ```sh
@@ -175,7 +185,7 @@ pnpm package:release
 
 That command writes a version-matched VSIX and server archive, a CycloneDX SBOM,
 licenses and third-party notices, a release manifest, and SHA-256 checksums under
-`artifacts/release-1.0.1/`. It has no upload or publication path. See the
+`artifacts/release-1.1.0/`. It has no upload or publication path. See the
 [release-candidate process](./docs/release-process.md).
 
 Test the exact packaged VSIX and extracted server rather than source-development bundles
@@ -198,11 +208,10 @@ Snap, and Flatpak are deferred and fail closed.
 
 ## Distribution status
 
-Version 1.0.0 is published as a complete GitHub Release. Version 1.0.1 supersedes it
-with the listener-startup lifecycle fix and is packaged under `artifacts/release-1.0.1/`
-before publication. The exact verified 1.0.1 VSIX from its GitHub Release is then
-uploaded manually to the VS Code Marketplace without rebuilding. Open VSX, npm, JSR,
-Yarn, and Bun remain out of scope.
+Version 1.0.1 is the current published GitHub and Marketplace release. Version 1.1.0 is
+packaged under `artifacts/release-1.1.0/` before publication. The exact verified 1.1.0
+VSIX from its GitHub Release is then uploaded manually to the VS Code Marketplace
+without rebuilding. Open VSX, npm, JSR, Yarn, and Bun remain out of scope.
 
 Installation, upgrade, downgrade, and removal are documented in
 [docs/installation.md](./docs/installation.md). Candidate construction and verification

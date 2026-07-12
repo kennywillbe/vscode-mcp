@@ -102,6 +102,8 @@ const APPROVED_EXECUTE_COMMAND_ARGUMENTS = new Set([
   'VSCODE_LANGUAGE_PROVIDER_COMMANDS.hover',
   'VSCODE_LANGUAGE_PROVIDER_COMMANDS.signatureHelp',
   'WORKSPACE_SYMBOL_COMMAND',
+  "'vscode.changes'",
+  "'vscode.diff'",
   "'vscode.executeCodeActionProvider'",
   "'vscode.executeCompletionItemProvider'",
   "'vscode.executeDocumentHighlights'",
@@ -118,14 +120,19 @@ const APPROVED_EXECUTE_COMMAND_ARGUMENTS = new Set([
 ]);
 
 const APPROVED_EXTENSION_COMMANDS = [
+  'vscode-mcp.clearChangeHighlights',
+  'vscode-mcp.clearCurrentFileChangeHighlights',
   'vscode-mcp.disable',
   'vscode-mcp.disableExecution',
   'vscode-mcp.disableWrites',
   'vscode-mcp.enable',
   'vscode-mcp.enableExecution',
   'vscode-mcp.enableWrites',
+  'vscode-mcp.nextChange',
+  'vscode-mcp.previousChange',
   'vscode-mcp.removeClient',
   'vscode-mcp.repairClient',
+  'vscode-mcp.reviewChanges',
   'vscode-mcp.setupClient',
   'vscode-mcp.showStatus',
 ] as const;

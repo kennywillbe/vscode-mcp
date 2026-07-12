@@ -21,7 +21,7 @@ suite('vscode-mcp extension', () => {
   test('is installed in the extension development host', () => {
     const extension = vscode.extensions.getExtension('vscode-mcp.vscode-mcp');
     assert.ok(extension);
-    assert.equal(extension.packageJSON.version, '1.0.1');
+    assert.equal(extension.packageJSON.version, '1.1.0');
   });
 
   test('registers status and client lifecycle commands', async () => {
@@ -33,6 +33,11 @@ suite('vscode-mcp extension', () => {
     assert.ok(commands.includes('vscode-mcp.setupClient'));
     assert.ok(commands.includes('vscode-mcp.repairClient'));
     assert.ok(commands.includes('vscode-mcp.removeClient'));
+    assert.ok(commands.includes('vscode-mcp.reviewChanges'));
+    assert.ok(commands.includes('vscode-mcp.nextChange'));
+    assert.ok(commands.includes('vscode-mcp.previousChange'));
+    assert.ok(commands.includes('vscode-mcp.clearChangeHighlights'));
+    assert.ok(commands.includes('vscode-mcp.clearCurrentFileChangeHighlights'));
   });
 
   const testPosix =
@@ -610,6 +615,7 @@ suite('vscode-mcp extension', () => {
         });
         assertToolFailure(overlapping, 'EDIT_CONFLICT');
 
+        await vscode.commands.executeCommand('vscode-mcp.clearChangeHighlights');
         const edited = await callTool(client, 'apply_text_edits', {
           instanceId,
           documents: [
@@ -637,6 +643,43 @@ suite('vscode-mcp extension', () => {
         );
         snapshot = await readToolDocument(client, instanceId, document);
         assert.match(String(snapshot.result['text']), /beta/);
+        await vscode.commands.executeCommand('vscode-mcp.nextChange');
+        assert.equal(
+          vscode.window.activeTextEditor?.document.uri.toString(),
+          createdUri.toString(),
+        );
+        assert.deepEqual(
+          vscode.window.activeTextEditor?.selection,
+          new vscode.Selection(
+            new vscode.Position(0, alphaStart),
+            new vscode.Position(0, alphaStart + 4),
+          ),
+        );
+        await vscode.commands.executeCommand('vscode-mcp.reviewChanges');
+        const diffTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+        assert.ok(diffTab?.input instanceof vscode.TabInputTextDiff);
+        assert.equal(diffTab.input.original.scheme, 'vscode-mcp-change');
+        assert.equal(diffTab.input.modified.toString(), createdUri.toString());
+        assert.match(
+          (await vscode.workspace.openTextDocument(diffTab.input.original)).getText(),
+          /alpha/,
+        );
+        assert.match(
+          (await vscode.workspace.openTextDocument(diffTab.input.modified)).getText(),
+          /beta/,
+        );
+        await vscode.commands.executeCommand('vscode-mcp.nextChange');
+        await vscode.commands.executeCommand(
+          'vscode-mcp.clearCurrentFileChangeHighlights',
+        );
+        const editorAfterClear = vscode.window.activeTextEditor;
+        assert.ok(editorAfterClear);
+        editorAfterClear.selection = new vscode.Selection(0, 0, 0, 0);
+        await vscode.commands.executeCommand('vscode-mcp.nextChange');
+        assert.deepEqual(
+          vscode.window.activeTextEditor?.selection,
+          new vscode.Selection(0, 0, 0, 0),
+        );
 
         const editedVersion = requiredNumber(snapshot.document, 'documentVersion');
         const reverted = await callTool(client, 'revert_documents', {
@@ -1010,7 +1053,17 @@ suite('vscode-mcp extension', () => {
               new vscode.CustomExecution(async () => terminal),
               [],
             );
-          return ambiguous ? [task(), task()] : [task()];
+          const bunMetadataTask = new vscode.Task(
+            { type: 'vscode-mcp-test' },
+            workspace,
+            'Bun Metadata Task',
+            'npm',
+            new vscode.ShellExecution('bun', ['run', 'check']),
+            [],
+          );
+          return ambiguous
+            ? [task(), task(), bunMetadataTask]
+            : [task(), bunMetadataTask];
         },
         resolveTask: () => undefined,
       });
@@ -1032,6 +1085,14 @@ suite('vscode-mcp extension', () => {
             isRecord(candidate) && candidate['name'] === 'Agent Workflow Task',
         );
         assert.ok(isRecord(task));
+        assert.equal(task['runner'], null);
+        const bunTask = tasks.find(
+          (candidate) =>
+            isRecord(candidate) && candidate['name'] === 'Bun Metadata Task',
+        );
+        assert.ok(isRecord(bunTask));
+        assert.equal(bunTask['source'], 'npm');
+        assert.equal(bunTask['runner'], 'bun');
         const taskId = requiredString(task, 'id');
 
         const denied = await callTool(client, 'run_task', { instanceId, taskId });
@@ -1752,7 +1813,7 @@ async function startMcpClient(workspacePath: string): Promise<JsonLineMcpClient>
   assert.equal(recordProperty(initialize, 'protocolVersion'), '2025-11-25');
   const serverInfo = requiredRecord(initialize, 'serverInfo');
   assert.equal(serverInfo['name'], 'vscode-mcp');
-  assert.equal(serverInfo['version'], '1.0.1');
+  assert.equal(serverInfo['version'], '1.1.0');
   client.notify('notifications/initialized', {});
   return client;
 }

@@ -61,6 +61,7 @@ class ExtensionController implements vscode.Disposable {
   #serviceFingerprint: string | undefined;
   #serviceFolderKey: string | undefined;
   #serviceStartResult: IpcInstanceServiceStartResult | undefined;
+  readonly #sessionEnabledState = new Map<string, boolean>();
   #refreshTail: Promise<void> = Promise.resolve();
   #statusDetail = 'VS Code MCP is starting.';
   #disposed = false;
@@ -69,8 +70,7 @@ class ExtensionController implements vscode.Disposable {
   constructor(context: vscode.ExtensionContext) {
     this.#context = context;
     this.#toolRouter = createVsCodeExtensionToolRouter({
-      isWorkspaceEnabled: (fingerprint) =>
-        this.#context.globalState.get<boolean>(enabledKey(fingerprint), false),
+      isWorkspaceEnabled: (fingerprint) => this.isWorkspaceEnabled(fingerprint),
     });
     this.#statusBar = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
@@ -105,6 +105,22 @@ class ExtensionController implements vscode.Disposable {
       ),
       vscode.commands.registerCommand('vscode-mcp.removeClient', () =>
         this.removeClient(),
+      ),
+      vscode.commands.registerCommand('vscode-mcp.reviewChanges', () =>
+        this.reviewChanges(),
+      ),
+      vscode.commands.registerCommand('vscode-mcp.nextChange', () =>
+        this.nextChange(1),
+      ),
+      vscode.commands.registerCommand('vscode-mcp.previousChange', () =>
+        this.nextChange(-1),
+      ),
+      vscode.commands.registerCommand('vscode-mcp.clearChangeHighlights', () =>
+        this.#runtime?.clearChangeHighlights(),
+      ),
+      vscode.commands.registerCommand(
+        'vscode-mcp.clearCurrentFileChangeHighlights',
+        () => this.#runtime?.clearCurrentFileChangeHighlights(),
       ),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
         void this.refresh();
@@ -150,9 +166,10 @@ class ExtensionController implements vscode.Disposable {
       enabledKey(eligibility.identity.fingerprint),
       true,
     );
-    // Older VS Code releases can briefly expose a stale Memento value immediately
-    // after update(). Retrying refresh only observes state; it never writes true again,
-    // so a concurrent disable remains authoritative and cannot publish a listener.
+    this.#sessionEnabledState.set(eligibility.identity.fingerprint, true);
+    // The session-local state above is authoritative while Memento persistence catches
+    // up on older VS Code releases. Retries still cover listener startup transitions;
+    // they never rewrite the user's enable decision.
     let startResult: IpcInstanceServiceStartResult | undefined;
     for (let attempt = 1; attempt <= SERVICE_READY_ATTEMPTS; attempt += 1) {
       await this.refresh();
@@ -198,10 +215,15 @@ class ExtensionController implements vscode.Disposable {
     this.#grants.revokeAll();
     const eligibility = await evaluateWorkspace();
     if (eligibility.identity) {
+      // Treat an explicit disable as authoritative for this extension session. VS Code
+      // 1.101 can briefly return the pre-update Memento value after update(false), so
+      // relying on globalState.get() alone can leave the old listener published and
+      // make the next enable inherit a listener that is about to stop.
       await this.#context.globalState.update(
         enabledKey(eligibility.identity.fingerprint),
         false,
       );
+      this.#sessionEnabledState.set(eligibility.identity.fingerprint, false);
     }
     await this.refresh();
     void vscode.window.showInformationMessage(
@@ -216,10 +238,7 @@ class ExtensionController implements vscode.Disposable {
       const enabled =
         eligibility.eligible &&
         eligibility.identity !== undefined &&
-        this.#context.globalState.get<boolean>(
-          enabledKey(eligibility.identity.fingerprint),
-          false,
-        );
+        this.isWorkspaceEnabled(eligibility.identity.fingerprint);
       if (
         enabled &&
         this.#serviceStartResult?.status === 'ready' &&
@@ -254,6 +273,28 @@ class ExtensionController implements vscode.Disposable {
   private async showStatus(): Promise<void> {
     await this.refresh();
     void vscode.window.showInformationMessage(this.#statusDetail);
+  }
+
+  private async reviewChanges(): Promise<void> {
+    const runtime = this.#runtime;
+    if (runtime === undefined) {
+      void vscode.window.showInformationMessage(
+        'Enable VS Code MCP for this workspace before reviewing changes.',
+      );
+      return;
+    }
+    await runtime.reviewChanges();
+  }
+
+  private async nextChange(direction: 1 | -1): Promise<void> {
+    const runtime = this.#runtime;
+    if (runtime === undefined) {
+      void vscode.window.showInformationMessage(
+        'Enable VS Code MCP for this workspace before navigating changes.',
+      );
+      return;
+    }
+    await runtime.nextChange(direction);
   }
 
   private async prepareClientSetupPrompt(): Promise<void> {
@@ -442,10 +483,7 @@ class ExtensionController implements vscode.Disposable {
     }
     const enabled =
       eligibility.identity !== undefined &&
-      this.#context.globalState.get<boolean>(
-        enabledKey(eligibility.identity.fingerprint),
-        false,
-      );
+      this.isWorkspaceEnabled(eligibility.identity.fingerprint);
     const shouldRun =
       eligibility.eligible && eligibility.identity !== undefined && enabled;
     const nextFingerprint = eligibility.identity?.fingerprint;
@@ -504,8 +542,7 @@ class ExtensionController implements vscode.Disposable {
           instanceId: this.#serviceStartResult.instanceId,
           legacy: this.#toolRouter,
           grants: this.#grants,
-          isWorkspaceEnabled: (fingerprint) =>
-            this.#context.globalState.get<boolean>(enabledKey(fingerprint), false),
+          isWorkspaceEnabled: (fingerprint) => this.isWorkspaceEnabled(fingerprint),
         });
       }
       if (this.#serviceStartResult.status !== 'ready') {
@@ -561,6 +598,13 @@ class ExtensionController implements vscode.Disposable {
       currentFolderKey() === folderKey &&
       this.#serviceFingerprint === fingerprint &&
       this.#serviceFolderKey === folderKey &&
+      this.isWorkspaceEnabled(fingerprint)
+    );
+  }
+
+  private isWorkspaceEnabled(fingerprint: string): boolean {
+    return (
+      this.#sessionEnabledState.get(fingerprint) ??
       this.#context.globalState.get<boolean>(enabledKey(fingerprint), false)
     );
   }

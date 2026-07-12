@@ -4,6 +4,7 @@ import {
   copyFile,
   lstat,
   open,
+  readFile,
   realpath,
   unlink,
 } from 'node:fs/promises';
@@ -31,6 +32,10 @@ import {
   type WorkspaceIdentity,
 } from './workspace-identity.js';
 import { SingleUseHandleStore } from './single-use-handle-store.js';
+import type {
+  VisualChangeController,
+  PreparedVisualChange,
+} from './visual-change-controller.js';
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
@@ -43,6 +48,7 @@ interface ToolDispatchResult {
 interface ServiceOptions {
   readonly grants: CapabilityGrantController;
   readonly isWorkspaceEnabled: (fingerprint: string) => boolean | PromiseLike<boolean>;
+  readonly visualChanges: VisualChangeController;
 }
 
 interface Access {
@@ -86,6 +92,7 @@ interface PreparedWorkspaceEdit {
 export class VsCodeV1IdeToolService implements vscode.Disposable {
   readonly #grants: CapabilityGrantController;
   readonly #isWorkspaceEnabled: ServiceOptions['isWorkspaceEnabled'];
+  readonly #visualChanges: VisualChangeController;
   readonly #disposables: vscode.Disposable[] = [];
   readonly #taskIds = new Map<string, string>();
   readonly #tasks = new Map<string, TrackedTask>();
@@ -99,6 +106,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
   public constructor(options: ServiceOptions) {
     this.#grants = options.grants;
     this.#isWorkspaceEnabled = options.isWorkspaceEnabled;
+    this.#visualChanges = options.visualChanges;
     this.#disposables.push(
       vscode.tasks.onDidEndTaskProcess((event) => {
         for (const tracked of this.#tasks.values()) {
@@ -538,6 +546,11 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       documents.push(document);
     }
     await ensureEditorTabs(documents);
+    const visual = this.#visualChanges.prepareWorkspaceEdit(
+      'apply_text_edits',
+      edit,
+      documents,
+    );
     finalWriteCheck(
       this.#grants,
       grant,
@@ -545,7 +558,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       args.documents.map((group) => group.expectedDocumentVersion),
       signal,
     );
-    const applied = await vscode.workspace.applyEdit(edit, { isRefactoring: true });
+    const applied = await this.applyEditWithVisual(edit, visual);
     if (!applied)
       throw new IdeToolError(
         'EDIT_CONFLICT',
@@ -592,6 +605,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       throw error;
     }
     await handle.close();
+    await this.recordCreatedFile(destination.path);
     return { created: args.destination };
   }
 
@@ -610,6 +624,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
         'DOCUMENT_OUTSIDE_WORKSPACE',
         'Source and destination must use the same workspace root.',
       );
+    const visualBefore = await readVisualSnapshot(source.path);
     if (!this.#grants.isCurrent(grant)) throw grantChanged('write');
     try {
       await copyFile(source.path, destination.path, fsConstants.COPYFILE_EXCL);
@@ -628,6 +643,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       await unlink(destination.path).catch(() => undefined);
       throw error;
     }
+    await this.recordMovedFile(source.path, destination.path, visualBefore);
     return { moved: true, destination: args.destination };
   }
 
@@ -640,8 +656,15 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
   ): Promise<Json> {
     const grant = requiredGrant(this.#grants, 'write');
     const source = await existingRegularPath(args.document, access);
+    const visualBefore = await readVisualSnapshot(source.path);
     if (!this.#grants.isCurrent(grant)) throw grantChanged('write');
     await unlink(source.path);
+    this.recordFileOperation(
+      'delete_workspace_file',
+      vscode.Uri.file(source.path),
+      'deleted',
+      visualBefore,
+    );
     return {
       deleted: true,
       document: {
@@ -731,7 +754,12 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
         );
       }
     });
-    if (!(await vscode.workspace.applyEdit(edit, { isRefactoring: true }))) {
+    const visual = this.#visualChanges.prepareWorkspaceEdit(
+      'revert_documents',
+      edit,
+      documents,
+    );
+    if (!(await this.applyEditWithVisual(edit, visual))) {
       throw new IdeToolError('EDIT_CONFLICT', 'VS Code rejected the revert edit.');
     }
     for (const document of documents) {
@@ -779,8 +807,13 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
         true,
       );
     await ensureEditorTabs(prepared.documents);
+    const visual = this.#visualChanges.prepareWorkspaceEdit(
+      'rename_symbol',
+      prepared.edit,
+      prepared.documents,
+    );
     finalWriteCheck(this.#grants, grant, prepared.documents, prepared.versions, signal);
-    if (!(await vscode.workspace.applyEdit(prepared.edit, { isRefactoring: true })))
+    if (!(await this.applyEditWithVisual(prepared.edit, visual)))
       throw new IdeToolError('EDIT_CONFLICT', 'VS Code rejected the rename edits.');
     return { renamed: true, document: documentIdentity(document, access) };
   }
@@ -830,6 +863,11 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     const workspaceEdit = new vscode.WorkspaceEdit();
     workspaceEdit.set(document.uri, requested);
     await ensureEditorTabs([document]);
+    const visual = this.#visualChanges.prepareWorkspaceEdit(
+      'format_document',
+      workspaceEdit,
+      [document],
+    );
     finalWriteCheck(
       this.#grants,
       grant,
@@ -837,7 +875,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       [args.expectedDocumentVersion],
       signal,
     );
-    if (!(await vscode.workspace.applyEdit(workspaceEdit, { isRefactoring: true })))
+    if (!(await this.applyEditWithVisual(workspaceEdit, visual)))
       throw new IdeToolError('EDIT_CONFLICT', 'VS Code rejected the formatting edits.');
     return {
       formatted: true,
@@ -869,13 +907,100 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     }
     const preview = taken.value;
     await ensureEditorTabs(preview.documents);
+    const visual = this.#visualChanges.prepareWorkspaceEdit(
+      'apply_code_action',
+      preview.edit,
+      preview.documents,
+    );
     finalWriteCheck(this.#grants, grant, preview.documents, preview.versions, signal);
-    if (!(await vscode.workspace.applyEdit(preview.edit, { isRefactoring: true })))
+    if (!(await this.applyEditWithVisual(preview.edit, visual)))
       throw new IdeToolError(
         'EDIT_CONFLICT',
         'VS Code rejected the code action edits.',
       );
     return { applied: true, workspace: access.identity.fingerprint.slice(0, 16) };
+  }
+
+  private commitVisual(prepared: PreparedVisualChange): void {
+    try {
+      this.#visualChanges.commitPrepared(prepared);
+    } catch {
+      // Visual attribution is best-effort UI and cannot change a committed mutation's
+      // public success/failure semantics.
+    }
+  }
+
+  private async applyEditWithVisual(
+    edit: vscode.WorkspaceEdit,
+    visual: PreparedVisualChange,
+  ): Promise<boolean> {
+    try {
+      this.#visualChanges.armPrepared(visual);
+    } catch {
+      // Visual attribution is best-effort and cannot prevent the mutation commit.
+    }
+    let applied = false;
+    try {
+      applied = await vscode.workspace.applyEdit(edit, { isRefactoring: true });
+    } finally {
+      if (!applied) {
+        try {
+          this.#visualChanges.cancelPrepared(visual);
+        } catch {
+          // Visual cleanup cannot replace the original mutation outcome.
+        }
+      }
+    }
+    if (applied) this.commitVisual(visual);
+    return applied;
+  }
+
+  private async recordCreatedFile(path: string): Promise<void> {
+    try {
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path));
+      await vscode.window.showTextDocument(document, {
+        preview: false,
+        preserveFocus: true,
+      });
+      this.#visualChanges.recordWholeDocument(
+        'create_workspace_file',
+        document,
+        'created',
+      );
+    } catch {
+      // The file operation already committed; visual attribution is best-effort.
+    }
+  }
+
+  private async recordMovedFile(
+    sourcePath: string,
+    destinationPath: string,
+    beforeText?: string,
+  ): Promise<void> {
+    try {
+      const uri = vscode.Uri.file(destinationPath);
+      const document = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(document, {
+        preview: false,
+        preserveFocus: true,
+      });
+      this.#visualChanges.recordMove(vscode.Uri.file(sourcePath), uri, beforeText);
+    } catch {
+      // The file operation already committed; visual attribution is best-effort.
+    }
+  }
+
+  private recordFileOperation(
+    tool: 'move_workspace_file' | 'delete_workspace_file',
+    uri: vscode.Uri,
+    kind: 'moved' | 'deleted',
+    beforeText?: string,
+  ): void {
+    try {
+      this.#visualChanges.recordFileOperation(tool, uri, kind, beforeText);
+    } catch {
+      // The file operation already committed; visual attribution is best-effort.
+    }
   }
 
   private async listTasks(access: Access): Promise<ToolDispatchResult> {
@@ -894,6 +1019,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
             id,
             name: task.name.slice(0, 512),
             source: task.source.slice(0, 512),
+            runner: safeTaskRunner(task),
             group: task.group?.id ?? null,
             background: task.isBackground,
             problemMatcherCount: task.problemMatchers.length,
@@ -1214,6 +1340,19 @@ interface DiskSnapshot {
   readonly size: number;
   readonly mtimeMs: number;
   readonly text: string;
+}
+
+async function readVisualSnapshot(path: string): Promise<string | undefined> {
+  try {
+    const stats = await lstat(path);
+    if (!stats.isFile() || stats.isSymbolicLink() || stats.size > 2 * 1024 * 1024)
+      return undefined;
+    const bytes = await readFile(path);
+    if (bytes.byteLength > 2 * 1024 * 1024) return undefined;
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
 }
 
 async function readDiskSnapshot(path: string): Promise<DiskSnapshot> {
@@ -1797,9 +1936,42 @@ function taskFingerprint(task: vscode.Task): string {
         task.definition.type,
         scope,
         task.group?.id ?? null,
+        safeTaskRunner(task),
       ]),
     )
     .digest('hex');
+}
+
+type SafeTaskRunner = 'npm' | 'yarn' | 'pnpm' | 'bun' | 'node' | 'vp';
+
+function safeTaskRunner(task: vscode.Task): SafeTaskRunner | null {
+  const execution = task.execution;
+  if (execution instanceof vscode.ProcessExecution) {
+    return allowlistedTaskRunner(execution.process);
+  }
+  if (execution instanceof vscode.ShellExecution && execution.command !== undefined) {
+    return allowlistedTaskRunner(
+      typeof execution.command === 'string'
+        ? execution.command
+        : execution.command.value,
+    );
+  }
+  return null;
+}
+
+function allowlistedTaskRunner(command: string): SafeTaskRunner | null {
+  const executable = command.split(/[\\/]/).at(-1)?.toLowerCase();
+  switch (executable) {
+    case 'npm':
+    case 'yarn':
+    case 'pnpm':
+    case 'bun':
+    case 'node':
+    case 'vp':
+      return executable;
+    default:
+      return null;
+  }
 }
 function taskInAccess(task: vscode.Task, access: Access): boolean {
   const scope = task.scope;

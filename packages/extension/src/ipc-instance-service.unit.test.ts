@@ -299,6 +299,82 @@ it('notifies once after an eligibility-losing heartbeat stops the service', asyn
   }
 });
 
+it('preserves the listener instance after two transient heartbeat failures', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  try {
+    let renameAttempts = 0;
+    let notifications = 0;
+    const nodeFileSystem = NODE_RUNTIME_REGISTRY_DEPENDENCIES.fileSystem;
+    const registryDependencies: RuntimeRegistryDependencies = {
+      randomBytes: NODE_RUNTIME_REGISTRY_DEPENDENCIES.randomBytes,
+      fileSystem: {
+        ...nodeFileSystem,
+        rename: async (source, destination) => {
+          renameAttempts += 1;
+          if (renameAttempts === 2 || renameAttempts === 3) {
+            throw new Error('Transient heartbeat publication failure.');
+          }
+          await nodeFileSystem.rename(source, destination);
+        },
+      },
+    };
+    const running = await startFixture({
+      registryDependencies,
+      onUnexpectedStop: () => {
+        notifications += 1;
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(PROTOCOL_LIMITS.registryHeartbeatIntervalMs);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(renameAttempts).toBe(4);
+    expect(notifications).toBe(0);
+    const discovery = await discoverRegistryRecords(running.paths);
+    expect(discovery).toMatchObject({
+      status: 'ready',
+      records: [{ instanceId: running.snapshot.record.instanceId }],
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('bounds persistent heartbeat retries before stopping unexpectedly', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  try {
+    let renameAttempts = 0;
+    const notified = deferred();
+    const nodeFileSystem = NODE_RUNTIME_REGISTRY_DEPENDENCIES.fileSystem;
+    const registryDependencies: RuntimeRegistryDependencies = {
+      randomBytes: NODE_RUNTIME_REGISTRY_DEPENDENCIES.randomBytes,
+      fileSystem: {
+        ...nodeFileSystem,
+        rename: async (source, destination) => {
+          renameAttempts += 1;
+          if (renameAttempts > 1) {
+            throw new Error('Persistent heartbeat publication failure.');
+          }
+          await nodeFileSystem.rename(source, destination);
+        },
+      },
+    };
+    const running = await startFixture({
+      registryDependencies,
+      onUnexpectedStop: () => notified.resolve(),
+    });
+
+    await vi.advanceTimersByTimeAsync(PROTOCOL_LIMITS.registryHeartbeatIntervalMs);
+    await notified.promise;
+
+    expect(renameAttempts).toBe(4);
+    const discovery = await discoverRegistryRecords(running.paths);
+    expect(discovery).toMatchObject({ status: 'ready', records: [] });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 interface TestClient {
   readonly socket: Socket;
   readonly connection: MessageConnection;

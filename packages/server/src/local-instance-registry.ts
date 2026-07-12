@@ -32,6 +32,13 @@ import {
 import type { InstanceGateway, InstanceGatewayCallResult } from './sdk-adapter.js';
 
 const PROBE_CONCURRENCY = 4;
+const REPLACEMENT_CACHE_TTL_MS = 60_000;
+const REPLACEMENT_CACHE_MAX_ENTRIES = 64;
+
+interface RememberedInstanceIdentity {
+  readonly workspaceKey: string;
+  readonly observedAt: number;
+}
 
 export interface LocalInstanceRegistryOptions {
   readonly upperBound?: PinnedInstanceUpperBound;
@@ -65,6 +72,7 @@ export class LocalInstanceRegistry implements InstanceGateway {
     invocation: V1AllExtensionToolInvocation,
     options: InstanceToolCallOptions,
   ) => Promise<InstanceToolCallResult>;
+  readonly #rememberedInstances = new Map<string, RememberedInstanceIdentity>();
 
   public constructor(options: LocalInstanceRegistryOptions = {}) {
     this.#upperBound = options.upperBound ?? { kind: 'unbounded' };
@@ -80,6 +88,7 @@ export class LocalInstanceRegistry implements InstanceGateway {
 
   public async list(): Promise<ListInstancesResult> {
     const discovered = await this.#discoverAuthenticated();
+    this.#remember(discovered);
     const authenticated = discovered.map((entry) => entry.candidate);
     const resolution = resolveInstance({
       candidates: authenticated,
@@ -125,6 +134,7 @@ export class LocalInstanceRegistry implements InstanceGateway {
       await releaseSettle();
       discovered = await this.#discoverAuthenticated();
     }
+    this.#remember(discovered);
     if (signal.aborted) {
       return failed(cancellationError());
     }
@@ -137,7 +147,11 @@ export class LocalInstanceRegistry implements InstanceGateway {
       pathStrategy: this.#pathStrategy,
     });
     if (!resolution.ok) {
-      return failed(selectionError(resolution.errorCode));
+      const replacementInstanceId =
+        resolution.errorCode === 'INSTANCE_NOT_FOUND' && requestedInstanceId !== null
+          ? this.#replacementFor(requestedInstanceId, discovered)
+          : null;
+      return failed(selectionError(resolution.errorCode, replacementInstanceId));
     }
 
     const selected = discovered.find(
@@ -267,6 +281,65 @@ export class LocalInstanceRegistry implements InstanceGateway {
 
     return authenticated;
   }
+
+  #remember(discovered: readonly DiscoveredAuthenticatedInstance[]): void {
+    this.#pruneRemembered();
+    const observedAt = this.#now();
+    for (const entry of discovered) {
+      const instanceId = entry.candidate.safeDescriptor.instanceId;
+      this.#rememberedInstances.delete(instanceId);
+      this.#rememberedInstances.set(instanceId, {
+        workspaceKey: workspaceIdentityKey(entry.candidate),
+        observedAt,
+      });
+    }
+    while (this.#rememberedInstances.size > REPLACEMENT_CACHE_MAX_ENTRIES) {
+      const oldest = this.#rememberedInstances.keys().next().value;
+      if (oldest === undefined) break;
+      this.#rememberedInstances.delete(oldest);
+    }
+  }
+
+  #replacementFor(
+    requestedInstanceId: string,
+    discovered: readonly DiscoveredAuthenticatedInstance[],
+  ): string | null {
+    this.#pruneRemembered();
+    if (this.#upperBound.kind === 'instance') return null;
+    const remembered = this.#rememberedInstances.get(requestedInstanceId);
+    if (remembered === undefined) return null;
+
+    let candidates = discovered.map((entry) => entry.candidate);
+    if (this.#upperBound.kind === 'workspace') {
+      const bounded = resolveInstance({
+        candidates,
+        upperBound: this.#upperBound,
+        requestedInstanceId: null,
+        canonicalCwd: this.#canonicalCwd,
+        pathStrategy: this.#pathStrategy,
+      });
+      const allowed = new Set(bounded.resolution.candidateInstanceIds);
+      candidates = candidates.filter((candidate) =>
+        allowed.has(candidate.safeDescriptor.instanceId),
+      );
+    }
+
+    const matches = candidates.filter(
+      (candidate) =>
+        candidate.safeDescriptor.instanceId !== requestedInstanceId &&
+        workspaceIdentityKey(candidate) === remembered.workspaceKey,
+    );
+    return matches.length === 1 ? matches[0]!.safeDescriptor.instanceId : null;
+  }
+
+  #pruneRemembered(): void {
+    const cutoff = this.#now() - REPLACEMENT_CACHE_TTL_MS;
+    for (const [instanceId, remembered] of this.#rememberedInstances) {
+      if (remembered.observedAt < cutoff) {
+        this.#rememberedInstances.delete(instanceId);
+      }
+    }
+  }
 }
 
 function retrySafeTool(tool: V1AllExtensionToolInvocation['tool']): boolean {
@@ -302,6 +375,13 @@ function toSelectionCandidate(
   };
 }
 
+function workspaceIdentityKey(candidate: AuthenticatedInstanceCandidate): string {
+  return JSON.stringify({
+    roots: [...candidate.canonicalWorkspaceRoots].sort(),
+    workspaceFileUri: candidate.safeDescriptor.workspaceFileUri,
+  });
+}
+
 function visibleCandidates(
   candidates: readonly AuthenticatedInstanceCandidate[],
   upperBound: PinnedInstanceUpperBound,
@@ -323,6 +403,7 @@ function failed(error: ToolExecutionError): InstanceGatewayCallResult {
 
 function selectionError(
   code: 'INVALID_ARGUMENT' | 'INSTANCE_NOT_FOUND' | 'INSTANCE_AMBIGUOUS',
+  replacementInstanceId: string | null = null,
 ): ToolExecutionError {
   switch (code) {
     case 'INVALID_ARGUMENT':
@@ -342,6 +423,7 @@ function selectionError(
         code,
         'No eligible VS Code instance matches this request.',
         true,
+        replacementInstanceId === null ? undefined : { replacementInstanceId },
       );
   }
 }
@@ -354,6 +436,12 @@ function toolError(
   code: ToolExecutionError['code'],
   message: string,
   retryable: boolean,
+  details?: ToolExecutionError['details'],
 ): ToolExecutionError {
-  return ToolExecutionErrorSchema.parse({ code, message, retryable });
+  return ToolExecutionErrorSchema.parse({
+    code,
+    message,
+    retryable,
+    ...(details === undefined ? {} : { details }),
+  });
 }

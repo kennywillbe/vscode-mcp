@@ -1,14 +1,14 @@
 # Install and configure vscode-mcp
 
-> [!IMPORTANT] Version 1.0.0 is published on GitHub. These instructions target the
-> coordinated 1.0.1 extension/server release. Version 1.0 supports standard local VS
+> [!IMPORTANT] Version 1.0.1 is published on GitHub. These instructions target the
+> coordinated 1.1.0 extension/server release. Version 1.x supports standard local VS
 > Code Desktop on macOS and Linux. Windows is not supported and fails closed before IPC
 > publication.
 
 The complete product is distributed as two version-matched files in one GitHub Release:
 
-- `vscode-mcp-extension-1.0.1.vsix` runs inside local VS Code Desktop.
-- `vscode-mcp-server-1.0.1.tar.gz` contains the MCP `stdio` bridge.
+- `vscode-mcp-extension-1.1.0.vsix` runs inside local VS Code Desktop.
+- `vscode-mcp-server-1.1.0.tar.gz` contains the MCP `stdio` bridge.
 
 The Marketplace and GitHub Release VSIX also contain the exact bundled server so the
 extension can perform a local, user-approved client setup without a second download. The
@@ -75,15 +75,15 @@ On Linux, `sha256sum -c SHA256SUMS` is equivalent.
    VSIX...** or:
 
    ```sh
-   code --install-extension /absolute/path/vscode-mcp-extension-1.0.1.vsix
+   code --install-extension /absolute/path/vscode-mcp-extension-1.1.0.vsix
    ```
 
 2. Extract the bridge archive to a user-owned, stable directory:
 
    ```sh
-   mkdir -p "$HOME/.local/share/vscode-mcp/1.0.1"
-   tar -xzf vscode-mcp-server-1.0.1.tar.gz \
-     -C "$HOME/.local/share/vscode-mcp/1.0.1"
+   mkdir -p "$HOME/.local/share/vscode-mcp/1.1.0"
+   tar -xzf vscode-mcp-server-1.1.0.tar.gz \
+     -C "$HOME/.local/share/vscode-mcp/1.1.0"
    ```
 
 3. Open the local workspace in VS Code, review the Workspace Trust prompt, and trust it
@@ -101,7 +101,7 @@ On Linux, `sha256sum -c SHA256SUMS` is equivalent.
      "mcpServers": {
        "vscode": {
          "command": "node",
-         "args": ["/absolute/path/to/vscode-mcp/1.0.1/vscode-mcp-server/cli.mjs"]
+         "args": ["/absolute/path/to/vscode-mcp/1.1.0/vscode-mcp-server/cli.mjs"]
        }
      }
    }

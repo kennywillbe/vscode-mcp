@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -154,6 +154,110 @@ describePosix('local instance registry', () => {
       error: { code: 'INVALID_ARGUMENT', retryable: false },
     });
     expect(callRecord).not.toHaveBeenCalled();
+  });
+
+  it('suggests one recently observed same-workspace replacement instance', async () => {
+    const { environment, paths } = await fixtureRuntime();
+    const original = await publish(paths, 1, '/workspace');
+    const registry = new LocalInstanceRegistry({
+      runtimeEnvironment: environment,
+      probe: authenticate,
+    });
+    await registry.list();
+    await unlink(join(paths.instancesDirectory, original.fileName));
+    const replacement = await publish(paths, 2, '/workspace');
+
+    await expect(
+      registry.call(
+        editorInvocation(),
+        original.record.instanceId,
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      status: 'failed',
+      error: {
+        code: 'INSTANCE_NOT_FOUND',
+        retryable: true,
+        details: { replacementInstanceId: replacement.record.instanceId },
+      },
+    });
+  });
+
+  it('omits a replacement hint when same-workspace identity is ambiguous', async () => {
+    const { environment, paths } = await fixtureRuntime();
+    const original = await publish(paths, 1, '/workspace');
+    const registry = new LocalInstanceRegistry({
+      runtimeEnvironment: environment,
+      probe: authenticate,
+    });
+    await registry.list();
+    await unlink(join(paths.instancesDirectory, original.fileName));
+    await publish(paths, 2, '/workspace');
+    await publish(paths, 3, '/workspace');
+
+    await expect(
+      registry.call(
+        editorInvocation(),
+        original.record.instanceId,
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({
+      status: 'failed',
+      error: {
+        code: 'INSTANCE_NOT_FOUND',
+        message: 'No eligible VS Code instance matches this request.',
+        retryable: true,
+      },
+    });
+  });
+
+  it('expires replacement identity history and never hints across a pinned instance', async () => {
+    const { environment, paths } = await fixtureRuntime();
+    const original = await publish(paths, 1, '/workspace');
+    let now = 1_000;
+    const expiring = new LocalInstanceRegistry({
+      runtimeEnvironment: environment,
+      now: () => now,
+      probe: authenticate,
+    });
+    await expiring.list();
+    await unlink(join(paths.instancesDirectory, original.fileName));
+    const replacement = await publish(paths, 2, '/workspace');
+    now += 60_001;
+    const expired = await expiring.call(
+      editorInvocation(),
+      original.record.instanceId,
+      new AbortController().signal,
+    );
+    expect(expired).toMatchObject({
+      status: 'failed',
+      error: { code: 'INSTANCE_NOT_FOUND' },
+    });
+    expect(expired.status === 'failed' ? expired.error : null).not.toHaveProperty(
+      'details',
+    );
+
+    const pinned = new LocalInstanceRegistry({
+      runtimeEnvironment: environment,
+      upperBound: { kind: 'instance', instanceId: original.record.instanceId },
+      probe: authenticate,
+    });
+    await publish(paths, 1, '/workspace');
+    await pinned.list();
+    await unlink(join(paths.instancesDirectory, original.fileName));
+    const pinnedResult = await pinned.call(
+      editorInvocation(),
+      original.record.instanceId,
+      new AbortController().signal,
+    );
+    expect(pinnedResult).toMatchObject({
+      status: 'failed',
+      error: { code: 'INSTANCE_NOT_FOUND' },
+    });
+    expect(
+      pinnedResult.status === 'failed' ? pinnedResult.error : null,
+    ).not.toHaveProperty('details');
+    expect(replacement.record.instanceId).not.toBe(original.record.instanceId);
   });
 
   it.each([

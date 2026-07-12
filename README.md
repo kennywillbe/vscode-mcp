@@ -6,9 +6,9 @@ intelligence, version-checked edits and file operations, configured tasks, and n
 run/debug configurations without adding a generic shell, terminal, Git controller, or
 network service.
 
-> [!IMPORTANT] The local macOS/Linux 1.0 candidate is implemented and validated, but it
-> has not been published. Windows is deferred to separately approved post-1.0 work and
-> fails closed before listener or registry publication.
+> [!IMPORTANT] Version 1.0.0 is available from GitHub Releases and the VS Code
+> Marketplace. Version 1.0.1 contains the listener-startup lifecycle fix. Windows is
+> deferred and fails closed before listener or registry publication.
 
 ## Quick install
 
@@ -16,8 +16,8 @@ Requirements: local VS Code Desktop 1.101+ on macOS or Linux, and Node.js 22.13+
 
 1. Install **VS Code MCP** from the
    [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=vscode-mcp.vscode-mcp).
-   Before publication, install the release candidate with **Extensions: Install from
-   VSIX...**.
+   The checksummed GitHub Release VSIX is also available for manual installation with
+   **Extensions: Install from VSIX...**.
 2. Open the Command Palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` on Linux) and run
    **VS Code MCP: Set Up MCP Client**.
 3. Choose **Codex — install automatically**, review the generated TOML block, and select
@@ -166,7 +166,7 @@ Create a local, unpublished development VSIX with:
 pnpm package:vsix
 ```
 
-After every release gate is complete and all package versions are `1.0.0`, create the
+After every release gate is complete and all package versions are `1.0.1`, create the
 complete local candidate with:
 
 ```sh
@@ -175,7 +175,7 @@ pnpm package:release
 
 That command writes a version-matched VSIX and server archive, a CycloneDX SBOM,
 licenses and third-party notices, a release manifest, and SHA-256 checksums under
-`artifacts/release-1.0.0/`. It has no upload or publication path. See the
+`artifacts/release-1.0.1/`. It has no upload or publication path. See the
 [release-candidate process](./docs/release-process.md).
 
 Test the exact packaged VSIX and extracted server rather than source-development bundles
@@ -198,12 +198,11 @@ Snap, and Flatpak are deferred and fail closed.
 
 ## Distribution status
 
-No preview version, package, VSIX, or server archive has been published. The current
-`artifacts/release-1.0.0/` directory is the checksummed local 1.0 candidate produced
-from this working tree; it is not a public release. The repository is prepared privately
-before the first public `1.0.0` GitHub Release. After that release is verified, the same
-VSIX is published to the VS Code Marketplace. Open VSX, npm, JSR, Yarn, and Bun remain
-out of scope.
+Version 1.0.0 is published as a complete GitHub Release. Version 1.0.1 supersedes it
+with the listener-startup lifecycle fix and is packaged under `artifacts/release-1.0.1/`
+before publication. The exact verified 1.0.1 VSIX from its GitHub Release is then
+uploaded manually to the VS Code Marketplace without rebuilding. Open VSX, npm, JSR,
+Yarn, and Bun remain out of scope.
 
 Installation, upgrade, downgrade, and removal are documented in
 [docs/installation.md](./docs/installation.md). Candidate construction and verification

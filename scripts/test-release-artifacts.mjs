@@ -11,7 +11,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { inspectTarGzip, runCommand, verifyReleaseDirectory } from './release-lib.mjs';
+import {
+  RELEASE_DIRECTORY_NAME,
+  RELEASE_VERSION,
+  inspectTarGzip,
+  runCommand,
+  verifyReleaseDirectory,
+} from './release-lib.mjs';
 import {
   createArtifactTestEnvironment,
   parseArtifactTestArguments,
@@ -20,9 +26,15 @@ import {
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, '..');
 const extensionDirectory = path.join(repositoryRoot, 'packages', 'extension');
-const releaseDirectory = path.join(repositoryRoot, 'artifacts', 'release-1.0.0');
-const releaseVsixPath = path.join(releaseDirectory, 'vscode-mcp-extension-1.0.0.vsix');
-const serverArchivePath = path.join(releaseDirectory, 'vscode-mcp-server-1.0.0.tar.gz');
+const releaseDirectory = path.join(repositoryRoot, 'artifacts', RELEASE_DIRECTORY_NAME);
+const releaseVsixPath = path.join(
+  releaseDirectory,
+  `vscode-mcp-extension-${RELEASE_VERSION}.vsix`,
+);
+const serverArchivePath = path.join(
+  releaseDirectory,
+  `vscode-mcp-server-${RELEASE_VERSION}.tar.gz`,
+);
 const options = parseArtifactTestArguments(process.argv.slice(2));
 const temporaryRoot = await mkdtemp(
   path.join(os.tmpdir(), 'vscode-mcp-artifact-test-'),

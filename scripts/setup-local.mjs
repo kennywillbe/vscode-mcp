@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createMcpConfig, parseSetupArguments } from './dev-lib.mjs';
 import { runCommand } from './process-lib.mjs';
+import { RELEASE_VERSION } from './release-lib.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const options = parseSetupArguments(process.argv.slice(2));
@@ -19,7 +20,10 @@ if (options.help) {
 await runCommand(process.execPath, ['scripts/doctor.mjs'], { cwd: repositoryRoot });
 
 const localDirectory = path.join(repositoryRoot, 'artifacts', 'local');
-const vsixPath = path.join(localDirectory, 'vscode-mcp-extension-1.0.0.vsix');
+const vsixPath = path.join(
+  localDirectory,
+  `vscode-mcp-extension-${RELEASE_VERSION}.vsix`,
+);
 const serverPath = path.join(repositoryRoot, 'packages', 'server', 'dist', 'cli.mjs');
 const configPath = path.join(localDirectory, 'mcp-config.json');
 

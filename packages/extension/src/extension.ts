@@ -41,6 +41,8 @@ import {
 
 const ENABLED_KEY_PREFIX = 'workspaceEnabled:';
 const SETUP_PROMPT_KEY_PREFIX = 'clientSetupPrompted:';
+const SERVICE_READY_ATTEMPTS = 20;
+const SERVICE_READY_RETRY_DELAY_MS = 100;
 
 interface Eligibility {
   eligible: boolean;
@@ -115,7 +117,7 @@ class ExtensionController implements vscode.Disposable {
 
   async start(): Promise<void> {
     await this.refresh();
-    void this.promptForClientSetup().catch((error: unknown) => {
+    await this.prepareClientSetupPrompt().catch((error: unknown) => {
       void vscode.window.showErrorMessage(setupErrorMessage(error));
     });
   }
@@ -135,23 +137,61 @@ class ExtensionController implements vscode.Disposable {
     await operation;
   }
 
-  private async enable(): Promise<void> {
+  private async enable(): Promise<IpcInstanceServiceStartResult | undefined> {
     const eligibility = await evaluateWorkspace();
     if (!eligibility.eligible || !eligibility.identity) {
       void vscode.window.showErrorMessage(
         eligibility.reason ?? 'This workspace is not eligible for MCP access.',
       );
-      return;
+      return undefined;
     }
 
     await this.#context.globalState.update(
       enabledKey(eligibility.identity.fingerprint),
       true,
     );
-    await this.refresh();
-    void vscode.window.showInformationMessage(
-      `VS Code MCP enabled for ${eligibility.identity.displayName}.`,
+    // Older VS Code releases can briefly expose a stale Memento value immediately
+    // after update(). Retrying refresh only observes state; it never writes true again,
+    // so a concurrent disable remains authoritative and cannot publish a listener.
+    let startResult: IpcInstanceServiceStartResult | undefined;
+    for (let attempt = 1; attempt <= SERVICE_READY_ATTEMPTS; attempt += 1) {
+      await this.refresh();
+      startResult = this.#serviceStartResult;
+      if (
+        startResult?.status === 'ready' &&
+        this.#serviceFingerprint === eligibility.identity.fingerprint
+      ) {
+        void vscode.window.showInformationMessage(
+          `VS Code MCP enabled for ${eligibility.identity.displayName}.`,
+        );
+        return startResult;
+      }
+
+      const current = await evaluateWorkspace();
+      const sameEligibleWorkspace =
+        current.eligible &&
+        current.identity?.fingerprint === eligibility.identity.fingerprint;
+      const retryable =
+        startResult === undefined ||
+        (startResult.status === 'unavailable' && startResult.reason === 'INELIGIBLE');
+      if (!sameEligibleWorkspace || !retryable || attempt === SERVICE_READY_ATTEMPTS)
+        break;
+      await new Promise<void>((resolveDelay) =>
+        setTimeout(resolveDelay, SERVICE_READY_RETRY_DELAY_MS),
+      );
+    }
+
+    const failure: IpcInstanceServiceStartResult =
+      startResult?.status === 'unavailable'
+        ? startResult
+        : {
+            status: 'unavailable',
+            reason: 'INELIGIBLE',
+          };
+    void vscode.window.showErrorMessage(
+      `VS Code MCP could not start secure local IPC (${failure.reason}).`,
     );
+    return failure;
   }
 
   private async disable(): Promise<void> {
@@ -170,7 +210,7 @@ class ExtensionController implements vscode.Disposable {
   }
 
   private async enableCapability(capability: PrivilegedCapability): Promise<void> {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    for (let attempt = 0; attempt < SERVICE_READY_ATTEMPTS; attempt += 1) {
       await this.refresh();
       const eligibility = await evaluateWorkspace();
       const enabled =
@@ -193,7 +233,9 @@ class ExtensionController implements vscode.Disposable {
         return;
       }
       if (!enabled) break;
-      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 100));
+      await new Promise<void>((resolveDelay) =>
+        setTimeout(resolveDelay, SERVICE_READY_RETRY_DELAY_MS),
+      );
     }
     void vscode.window.showErrorMessage(
       'Enable VS Code MCP for this trusted workspace before granting privileged access.',
@@ -214,7 +256,7 @@ class ExtensionController implements vscode.Disposable {
     void vscode.window.showInformationMessage(this.#statusDetail);
   }
 
-  private async promptForClientSetup(): Promise<void> {
+  private async prepareClientSetupPrompt(): Promise<void> {
     const version = extensionVersion(this.#context);
     const key = `${SETUP_PROMPT_KEY_PREFIX}${version}`;
     if (
@@ -226,7 +268,16 @@ class ExtensionController implements vscode.Disposable {
     ) {
       return;
     }
+    // Command execution waits for activation, so completing this state update here
+    // prevents the first workspace enable from racing a second Memento write on older
+    // supported VS Code releases. The user interaction itself remains non-blocking.
     await this.#context.globalState.update(key, true);
+    void this.completeClientSetupPrompt().catch((error: unknown) => {
+      void vscode.window.showErrorMessage(setupErrorMessage(error));
+    });
+  }
+
+  private async completeClientSetupPrompt(): Promise<void> {
     const action = await vscode.window.showInformationMessage(
       'VS Code MCP is installed. Set up a local MCP client connection now?',
       'Set Up MCP Client',

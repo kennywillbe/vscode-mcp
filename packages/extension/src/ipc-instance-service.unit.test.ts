@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import { chmod, lstat, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises';
 import { createConnection, type Socket } from 'node:net';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import {
@@ -87,18 +87,24 @@ interface RunningFixture {
   readonly snapshot: RegistryRecordSnapshot;
 }
 
+interface UnstartedFixture {
+  readonly service: IpcInstanceService;
+  readonly runtimeEnvironment: RuntimeRegistryEnvironment;
+}
+
 interface FixtureServiceOptions {
   readonly extensionTools?: readonly V1AllExtensionToolName[];
   readonly callTool?: IpcCallToolHandler;
   readonly schedulerRuntime?: SchedulerRuntime;
   readonly credentialDependencies?: InstanceCredentialDependencies;
+  readonly registryDependencies?: RuntimeRegistryDependencies;
   readonly isEligible?: () => boolean;
   readonly onUnexpectedStop?: () => void;
 }
 
-async function startFixture(
+async function createFixtureService(
   options: FixtureServiceOptions = {},
-): Promise<RunningFixture> {
+): Promise<UnstartedFixture> {
   const fixture = await mkdtemp('/tmp/vscode-mcp-ipc-service-');
   fixtures.push(fixture);
   const xdgRuntimeDirectory = join(fixture, 'xdg');
@@ -140,11 +146,22 @@ async function startFixture(
     ...(options.credentialDependencies === undefined
       ? {}
       : { credentialDependencies: options.credentialDependencies }),
+    ...(options.registryDependencies === undefined
+      ? {}
+      : { registryDependencies: options.registryDependencies }),
     ...(options.onUnexpectedStop === undefined
       ? {}
       : { onUnexpectedStop: options.onUnexpectedStop }),
   });
   services.push(service);
+
+  return { service, runtimeEnvironment };
+}
+
+async function startFixture(
+  options: FixtureServiceOptions = {},
+): Promise<RunningFixture> {
+  const { service, runtimeEnvironment } = await createFixtureService(options);
 
   const started = await service.start();
   if (started.status !== 'ready') {
@@ -165,6 +182,96 @@ async function startFixture(
   }
   return { service, paths: resolution.paths, snapshot };
 }
+
+it('recovers after two transient registry publication failures', async () => {
+  let renameAttempts = 0;
+  const nodeFileSystem = NODE_RUNTIME_REGISTRY_DEPENDENCIES.fileSystem;
+  const registryDependencies: RuntimeRegistryDependencies = {
+    randomBytes: NODE_RUNTIME_REGISTRY_DEPENDENCIES.randomBytes,
+    fileSystem: {
+      ...nodeFileSystem,
+      rename: async (source, destination) => {
+        renameAttempts += 1;
+        if (renameAttempts < 3) {
+          throw new Error('Transient registry publication failure.');
+        }
+        await nodeFileSystem.rename(source, destination);
+      },
+    },
+  };
+
+  const running = await startFixture({ registryDependencies });
+
+  expect(renameAttempts).toBe(3);
+  const registryEntries = await readdir(running.paths.instancesDirectory);
+  expect(registryEntries).toEqual([`${running.snapshot.record.instanceId}.json`]);
+  expect(await readdir(running.paths.socketsDirectory)).toEqual([
+    basename(running.snapshot.record.endpoint.path),
+  ]);
+});
+
+it('bounds persistent registry publication failures and removes every artifact', async () => {
+  let renameAttempts = 0;
+  const nodeFileSystem = NODE_RUNTIME_REGISTRY_DEPENDENCIES.fileSystem;
+  const registryDependencies: RuntimeRegistryDependencies = {
+    randomBytes: NODE_RUNTIME_REGISTRY_DEPENDENCIES.randomBytes,
+    fileSystem: {
+      ...nodeFileSystem,
+      rename: async () => {
+        renameAttempts += 1;
+        throw new Error('Persistent registry publication failure.');
+      },
+    },
+  };
+  const { service, runtimeEnvironment } = await createFixtureService({
+    registryDependencies,
+  });
+
+  await expect(service.start()).resolves.toEqual({
+    status: 'unavailable',
+    reason: 'START_FAILED',
+    stage: 'PUBLISH_REGISTRY',
+  });
+  expect(renameAttempts).toBe(3);
+
+  const resolution = await resolveRuntimeRegistryPaths(runtimeEnvironment);
+  expect(resolution.status).toBe('ready');
+  if (resolution.status !== 'ready') return;
+  expect(await readdir(resolution.paths.instancesDirectory)).toEqual([]);
+  expect(await readdir(resolution.paths.socketsDirectory)).toEqual([]);
+});
+
+it('does not retry a failed publication after stop is requested', async () => {
+  let renameAttempts = 0;
+  const renameEntered = deferred();
+  const renameRelease = deferred();
+  const nodeFileSystem = NODE_RUNTIME_REGISTRY_DEPENDENCIES.fileSystem;
+  const registryDependencies: RuntimeRegistryDependencies = {
+    randomBytes: NODE_RUNTIME_REGISTRY_DEPENDENCIES.randomBytes,
+    fileSystem: {
+      ...nodeFileSystem,
+      rename: async () => {
+        renameAttempts += 1;
+        renameEntered.resolve();
+        await renameRelease.promise;
+        throw new Error('Interrupted registry publication failure.');
+      },
+    },
+  };
+  const { service } = await createFixtureService({ registryDependencies });
+
+  const startOperation = service.start();
+  await renameEntered.promise;
+  const stopOperation = service.stop();
+  renameRelease.resolve();
+
+  await expect(startOperation).resolves.toEqual({
+    status: 'unavailable',
+    reason: 'LIFECYCLE_BUSY',
+  });
+  await stopOperation;
+  expect(renameAttempts).toBe(1);
+});
 
 it('notifies once after an eligibility-losing heartbeat stops the service', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });

@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run vscode-mcp Extension (watch)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/extension",
+        "${workspaceFolder}/fixtures/basic-workspace"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/extension/dist/**/*.js"],
+      "preLaunchTask": "pnpm: dev"
+    },
+    {
+      "name": "Run vscode-mcp Extension (one-shot)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/extension",
+        "${workspaceFolder}/fixtures/basic-workspace"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/extension/dist/**/*.js"],
+      "preLaunchTask": "pnpm: build"
+    }
+  ]
+}

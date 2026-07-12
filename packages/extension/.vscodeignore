@@ -1,0 +1,8 @@
+.vscode-test/**
+out/**
+src/**
+*.mjs
+!server/cli.mjs
+!server/manifest.json
+tsconfig*.json
+node_modules/**

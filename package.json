@@ -1,0 +1,69 @@
+{
+  "name": "vscode-mcp-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Secure, multi-window MCP access to VS Code language intelligence.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/kennywillbe/vscode-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kennywillbe/vscode-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kennywillbe/vscode-mcp/issues"
+  },
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "engines": {
+    "node": "^22.13.0",
+    "pnpm": ">=10.24.0 <11"
+  },
+  "scripts": {
+    "audit": "pnpm audit --audit-level=high",
+    "build": "pnpm -r --if-present run build",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:unit",
+    "ci": "pnpm run check && pnpm run build && pnpm run test:extension",
+    "clean": "rimraf artifacts coverage && pnpm -r --if-present run clean",
+    "dev": "node scripts/dev.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "package:release": "node scripts/package-release.mjs",
+    "package:vsix": "pnpm --filter vscode-mcp run package:vsix",
+    "research:scanner": "pnpm --filter vscode-mcp run research:scanner",
+    "research:write": "pnpm --filter vscode-mcp run research:write",
+    "setup:local": "node scripts/setup-local.mjs",
+    "test": "pnpm run test:unit && pnpm run test:extension",
+    "test:artifacts": "node scripts/test-release-artifacts.mjs",
+    "test:extension": "pnpm --filter vscode-mcp run test:integration",
+    "test:local": "node scripts/test-release-artifacts.mjs --vsix artifacts/local/vscode-mcp-extension-1.0.0.vsix --server packages/server/dist/cli.mjs",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "typecheck": "pnpm -r --if-present run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.1",
+    "@vscode/vsce": "3.9.2",
+    "concurrently": "10.0.3",
+    "esbuild": "0.28.1",
+    "eslint": "10.6.0",
+    "globals": "17.7.0",
+    "prettier": "3.9.5",
+    "rimraf": "6.1.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.63.0",
+    "vitest": "4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ],
+    "overrides": {
+      "diff": "8.0.4",
+      "serialize-javascript": "7.0.7"
+    }
+  }
+}

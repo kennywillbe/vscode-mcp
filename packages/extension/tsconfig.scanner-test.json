@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "types": ["node", "vscode", "mocha"]
+  },
+  "include": [
+    "src/test/scanner-spike.ts",
+    "src/workspace-authorizer.ts",
+    "src/workspace-discovery-cursor.ts",
+    "src/workspace-file-discovery-service.ts",
+    "src/workspace-identity.ts",
+    "src/vscode-workspace-file-discovery-adapter.ts"
+  ]
+}

@@ -6,6 +6,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -65,7 +66,7 @@ suite('vscode-mcp extension', () => {
         assert.deepEqual(instanceDescriptors(disabled), []);
         assert.equal(JSON.stringify(disabled).includes(workspacePath), false);
 
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
 
         const firstInstance = await waitForSingleInstance(client);
         assertNoForbiddenInstanceMetadata(firstInstance);
@@ -304,7 +305,7 @@ suite('vscode-mcp extension', () => {
       let workspaceFolderAdded = false;
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const original = await waitForSingleInstance(client);
         const originalInstanceId = requiredString(original, 'instanceId');
         assert.equal(await registryRecordExists(originalInstanceId), true);
@@ -331,7 +332,7 @@ suite('vscode-mcp extension', () => {
             : null;
         });
 
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const changed = await waitForSingleInstance(client);
         const changedInstanceId = requiredString(changed, 'instanceId');
         assert.notEqual(changedInstanceId, originalInstanceId);
@@ -388,7 +389,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspacePath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const instanceId = requiredString(instance, 'instanceId');
         const folders = instance['workspaceFolders'];
@@ -883,7 +884,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspace.uri.fsPath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         let instanceId = requiredString(instance, 'instanceId');
         const folders = instance['workspaceFolders'];
@@ -1016,7 +1017,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspace.uri.fsPath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const instanceId = requiredString(instance, 'instanceId');
         const listed = await callTool(client, 'list_tasks', { instanceId });
@@ -1124,7 +1125,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspace.uri.fsPath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const instanceId = requiredString(instance, 'instanceId');
         const folders = instance['workspaceFolders'];
@@ -1268,7 +1269,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspacePath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const instanceId = requiredString(instance, 'instanceId');
         const response = await callTool(client, 'get_definition', {
@@ -1341,7 +1342,7 @@ suite('vscode-mcp extension', () => {
       );
       const client = await startMcpClient(workspacePath);
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const response = await callTool(client, 'get_completions', {
           instanceId: requiredString(instance, 'instanceId'),
@@ -1387,7 +1388,7 @@ suite('vscode-mcp extension', () => {
       let ipc: FramedJsonRpcClient | undefined;
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         ipc = await eventually(async () => {
           let candidate: FramedJsonRpcClient | undefined;
           try {
@@ -1490,7 +1491,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspacePath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const instanceId = requiredString(instance, 'instanceId');
         const folders = instance['workspaceFolders'];
@@ -1612,7 +1613,7 @@ suite('vscode-mcp extension', () => {
       const client = await startMcpClient(workspacePath);
 
       try {
-        await vscode.commands.executeCommand('vscode-mcp.enable');
+        await enableWorkspaceMcp();
         const instance = await waitForSingleInstance(client);
         const instanceId = requiredString(instance, 'instanceId');
 
@@ -1681,7 +1682,7 @@ suite('vscode-mcp extension', () => {
           );
 
           disableRace.release();
-          await vscode.commands.executeCommand('vscode-mcp.enable');
+          await enableWorkspaceMcp();
           const restarted = await waitForSingleInstance(client);
           const restartedInstanceId = requiredString(restarted, 'instanceId');
           assert.notEqual(restartedInstanceId, instanceId);
@@ -1718,6 +1719,20 @@ suite('vscode-mcp extension', () => {
     },
   );
 });
+
+async function enableWorkspaceMcp(): Promise<void> {
+  const result = await vscode.commands.executeCommand<unknown>('vscode-mcp.enable');
+  if (isRecord(result) && result['status'] === 'ready') return;
+  const reason =
+    isRecord(result) && typeof result['reason'] === 'string'
+      ? result['reason']
+      : 'NO_START_RESULT';
+  const stage =
+    isRecord(result) && typeof result['stage'] === 'string' ? result['stage'] : 'NONE';
+  throw new Error(
+    `VS Code MCP enable did not start secure local IPC (reason: ${reason}, stage: ${stage}).`,
+  );
+}
 
 async function startMcpClient(workspacePath: string): Promise<JsonLineMcpClient> {
   const bridgePath =
@@ -1781,11 +1796,41 @@ function instanceDescriptors(response: unknown): unknown[] {
 async function waitForSingleInstance(
   client: JsonLineMcpClient,
 ): Promise<Record<string, unknown>> {
-  return eventually(async () => {
-    const instances = instanceDescriptors(await callTool(client, 'list_instances', {}));
-    const instance = instances.length === 1 ? instances[0] : undefined;
-    return isRecord(instance) ? instance : null;
-  });
+  let observedInstanceCount = 0;
+  try {
+    return await eventually(async () => {
+      const instances = instanceDescriptors(
+        await callTool(client, 'list_instances', {}),
+      );
+      observedInstanceCount = instances.length;
+      const instance = instances.length === 1 ? instances[0] : undefined;
+      return isRecord(instance) ? instance : null;
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === 'The expected MCP result was not available before the deadline.'
+    ) {
+      throw new Error(
+        `The expected single MCP instance was not available before the deadline (eligible instances: ${observedInstanceCount}, registry records: ${await countRegistryRecords()}).`,
+      );
+    }
+    throw error;
+  }
+}
+
+async function countRegistryRecords(): Promise<number> {
+  let count = 0;
+  for (const directory of registryDirectories()) {
+    try {
+      count += (await readdir(directory)).filter((name) =>
+        name.endsWith('.json'),
+      ).length;
+    } catch {
+      // A runtime-directory candidate may be absent when the other candidate is active.
+    }
+  }
+  return count;
 }
 
 function assertNoForbiddenInstanceMetadata(instance: Record<string, unknown>): void {

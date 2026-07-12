@@ -95,6 +95,8 @@ import {
 
 const SOCKET_MODE = 0o600;
 const PERMISSION_MASK = 0o7777;
+const LISTENER_START_ATTEMPTS = 3;
+const LISTENER_START_RETRY_DELAY_MS = 25;
 
 export interface IpcInstanceServiceIdentity {
   readonly extensionVersion: string;
@@ -132,6 +134,14 @@ export type IpcInstanceServiceUnavailableReason =
   | 'CURRENT_UID_UNAVAILABLE'
   | 'NO_SECURE_RUNTIME_DIRECTORY';
 
+export type IpcInstanceServiceStartFailureStage =
+  | 'RESOLVE_RUNTIME'
+  | 'CREATE_LISTENER'
+  | 'LISTEN'
+  | 'SECURE_SOCKET'
+  | 'PUBLISH_REGISTRY'
+  | 'VERIFY_REGISTRY';
+
 export type IpcInstanceServiceStartResult =
   | {
       readonly status: 'ready';
@@ -141,6 +151,7 @@ export type IpcInstanceServiceStartResult =
   | {
       readonly status: 'unavailable';
       readonly reason: IpcInstanceServiceUnavailableReason;
+      readonly stage?: IpcInstanceServiceStartFailureStage;
     };
 
 type ServiceLifecycle = 'idle' | 'starting' | 'running' | 'stopping' | 'stopped';
@@ -905,6 +916,7 @@ export class IpcInstanceService {
   private heartbeatOperation: Promise<void> | undefined;
   private startOperation: Promise<IpcInstanceServiceStartResult> | undefined;
   private stopOperation: Promise<void> | undefined;
+  private stopRequested = false;
   private unexpectedStopNotified = false;
 
   public constructor(private readonly options: IpcInstanceServiceOptions) {
@@ -926,8 +938,9 @@ export class IpcInstanceService {
       return { status: 'unavailable', reason: 'INELIGIBLE' };
     }
 
+    this.stopRequested = false;
     this.lifecycle = 'starting';
-    const operation = this.performStart();
+    const operation = this.performStartWithRetry();
     this.startOperation = operation;
     try {
       return await operation;
@@ -938,9 +951,38 @@ export class IpcInstanceService {
     }
   }
 
+  private async performStartWithRetry(): Promise<IpcInstanceServiceStartResult> {
+    // performStart removes only its owned random socket and unpublished registry
+    // artifacts before returning START_FAILED. Initial secure-runtime and eligibility
+    // rejections use distinct reasons; bounded retries never repair or delete unsafe
+    // paths.
+    for (let attempt = 1; attempt <= LISTENER_START_ATTEMPTS; attempt += 1) {
+      const result = await this.performStart();
+      if (
+        result.status === 'ready' ||
+        result.reason !== 'START_FAILED' ||
+        attempt === LISTENER_START_ATTEMPTS
+      ) {
+        return result;
+      }
+      await new Promise<void>((resolveDelay) =>
+        setTimeout(resolveDelay, LISTENER_START_RETRY_DELAY_MS),
+      );
+      if (this.stopRequested) {
+        return { status: 'unavailable', reason: 'LIFECYCLE_BUSY' };
+      }
+      if (!this.eligibilityIsCurrent()) {
+        return { status: 'unavailable', reason: 'INELIGIBLE' };
+      }
+      this.lifecycle = 'starting';
+    }
+    return { status: 'unavailable', reason: 'START_FAILED' };
+  }
+
   private async performStart(): Promise<IpcInstanceServiceStartResult> {
     const dependencies =
       this.options.registryDependencies ?? NODE_RUNTIME_REGISTRY_DEPENDENCIES;
+    let stage: IpcInstanceServiceStartFailureStage = 'RESOLVE_RUNTIME';
     try {
       const resolution = await resolveRuntimeRegistryPaths(
         this.options.runtimeEnvironment,
@@ -952,6 +994,7 @@ export class IpcInstanceService {
         return { status: 'unavailable', reason: resolution.reason };
       }
 
+      stage = 'CREATE_LISTENER';
       const active = this.createActiveInstance(resolution.paths);
       this.active = active;
       const server = createServer((socket) => {
@@ -959,8 +1002,10 @@ export class IpcInstanceService {
       });
       this.server = server;
 
+      stage = 'LISTEN';
       await listenOnSocket(server, active.socketPath);
       server.on('error', this.handleServerError);
+      stage = 'SECURE_SOCKET';
       await chmod(active.socketPath, SOCKET_MODE);
       active.socketIdentity = await inspectOwnedSocket(
         active.socketPath,
@@ -968,8 +1013,10 @@ export class IpcInstanceService {
       );
       this.assertStartMayContinue();
 
+      stage = 'PUBLISH_REGISTRY';
       await writeRegistryRecord(active.paths, active.record, dependencies);
       this.assertStartMayContinue();
+      stage = 'VERIFY_REGISTRY';
       const publishedSnapshot = await readRegistryRecordSnapshot(
         active.paths,
         active.credentials.instanceId,
@@ -993,11 +1040,13 @@ export class IpcInstanceService {
       return {
         status: 'unavailable',
         reason: error instanceof StartInterruptedError ? error.reason : 'START_FAILED',
+        ...(error instanceof StartInterruptedError ? {} : { stage }),
       };
     }
   }
 
   public async stop(): Promise<void> {
+    this.stopRequested = true;
     if (this.stopOperation !== undefined) {
       await this.stopOperation;
       return;

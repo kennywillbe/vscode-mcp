@@ -75,6 +75,8 @@ interface TrackedDebug {
   state: 'running' | 'stopped';
   endedAt: string | null;
   session?: vscode.DebugSession;
+  awaitingStart: boolean;
+  stopRequested: boolean;
 }
 
 interface CodeActionPreview {
@@ -122,11 +124,13 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
         for (const tracked of this.#debug.values()) {
           if (
             tracked.session === undefined &&
-            tracked.state === 'running' &&
+            (tracked.state === 'running' || tracked.awaitingStart) &&
             debugSessionMatches(tracked, session)
           ) {
             tracked.session = session;
             tracked.type = session.type;
+            tracked.awaitingStart = false;
+            if (tracked.state === 'stopped') requestDebugStop(tracked);
             break;
           }
         }
@@ -172,9 +176,7 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       clearTimeout(tracked.timer);
     }
     for (const tracked of this.#debug.values()) {
-      if (tracked.state === 'running' && tracked.session !== undefined) {
-        void vscode.debug.stopDebugging(tracked.session);
-      }
+      if (tracked.state === 'running') requestDebugStop(tracked);
       tracked.state = 'stopped';
       tracked.endedAt = new Date().toISOString();
     }
@@ -1056,6 +1058,10 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       );
     if (!this.#grants.isCurrent(grant)) throw grantChanged('execution');
     const execution = await vscode.tasks.executeTask(matches[0]!);
+    if (!this.#grants.isCurrent(grant)) {
+      execution.terminate();
+      throw grantChanged('execution');
+    }
     const executionId = randomUUID();
     const timer = setTimeout(() => {
       execution.terminate();
@@ -1212,12 +1218,15 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       startedAt: new Date().toISOString(),
       state: 'running',
       endedAt: null,
+      awaitingStart: true,
+      stopRequested: false,
     };
     this.#debug.set(id, tracked);
     const started = await vscode.debug.startDebugging(folder, args.configurationName, {
       noDebug: args.noDebug ?? false,
     });
     if (!started) {
+      tracked.awaitingStart = false;
       this.#debug.delete(id);
       throw new IdeToolError(
         'DEBUG_CONFIGURATION_NOT_FOUND',
@@ -1233,12 +1242,26 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       tracked.session = active;
       tracked.name = active.name;
       tracked.type = active.type;
+      tracked.awaitingStart = false;
+    }
+    if (!this.#grants.isCurrent(grant)) {
+      tracked.state = 'stopped';
+      tracked.endedAt = new Date().toISOString();
+      requestDebugStop(tracked);
+      if (tracked.session === undefined) {
+        setTimeout(() => {
+          tracked.awaitingStart = false;
+          if (tracked.session === undefined) this.#debug.delete(id);
+        }, 2_000);
+      }
+      throw grantChanged('execution');
     }
     const deadline = Date.now() + 2_000;
     while (tracked.session === undefined && Date.now() < deadline) {
       await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 25));
     }
     if (tracked.session === undefined) {
+      tracked.awaitingStart = false;
       this.#debug.delete(id);
       throw new IdeToolError(
         'DEBUG_CONFIGURATION_NOT_FOUND',
@@ -1295,6 +1318,12 @@ function debugSessionMatches(
     (tracked.folderUri === session.workspaceFolder?.uri.toString() ||
       (session.workspaceFolder === undefined && tracked.allowUnscopedSession))
   );
+}
+
+function requestDebugStop(tracked: TrackedDebug): void {
+  if (tracked.session === undefined || tracked.stopRequested) return;
+  tracked.stopRequested = true;
+  void vscode.debug.stopDebugging(tracked.session);
 }
 
 function summarizeWorkspaceEdit(

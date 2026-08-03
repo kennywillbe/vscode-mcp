@@ -24,7 +24,7 @@
     "watch:types": "tsc --noEmit -p tsconfig.json --watch"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@vscode-mcp/protocol": "workspace:*",
     "vscode-jsonrpc": "9.0.1",
     "zod": "4.4.3"

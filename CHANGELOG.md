@@ -3,6 +3,26 @@
 All notable changes to `vscode-mcp` are documented here. The project uses Semantic
 Versioning for its public release artifacts.
 
+## 1.1.1 — 2026-08-19
+
+- Bounded visual-change before-snapshot allocation before materializing document text,
+  preserving the advertised 2 MiB per-snapshot and 32 MiB aggregate memory limits even
+  for very large live documents.
+- Closed task and debug startup races so revoking the execution grant terminates work
+  whose VS Code execution handle or session arrives after revocation.
+- Applied raw collection, field, text, edit, and task limits before traversing
+  provider-controlled output, and require an active write grant before preparing code
+  action edit previews.
+- Replaced repeated partial-message concatenation in the bounded MCP stdio transport
+  with fixed-capacity linear copying.
+- Refreshed direct and transitive dependencies to resolve all known `pnpm audit`
+  advisories, including the MCP SDK, PostCSS, Hono, Undici, `brace-expansion`,
+  `fast-uri`, `ip-address`, `js-yaml`, `nanoid`, and `shell-quote` chains.
+- Updated pinned CI actions and the Node.js 22 security-patch baseline while preserving
+  the minimum supported Node.js and VS Code versions.
+- Added regression coverage for bounded snapshot reads, late task/debug startup, and
+  maximally fragmented stdio messages.
+
 ## 1.1.0 — 2026-07-13
 
 - Added bounded, memory-only visual tracking for successful MCP mutations with

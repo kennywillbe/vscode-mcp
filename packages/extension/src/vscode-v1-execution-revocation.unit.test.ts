@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const vscodeMock = vi.hoisted(() => {
   const taskEndListeners: Array<(event: unknown) => void> = [];
+  const workspacePath = process.cwd();
   const uri = {
     scheme: 'file',
-    fsPath: '/workspace',
-    toString: () => 'file:///workspace',
+    fsPath: workspacePath,
+    toString: () => `file://${workspacePath}`,
   };
   interface DebugSession {
     id: string;
@@ -173,6 +174,29 @@ describe('execution revocation during VS Code startup', () => {
     expect(terminate).toHaveBeenCalledOnce();
   });
 
+  it('terminates a task whose execution handle arrives after service disposal', async () => {
+    const grants = new CapabilityGrantController();
+    grants.grant('execution');
+    const service = createService(grants);
+    const listed = await call(service, 'list_tasks', {});
+    if (listed.outcome !== 'success') throw new Error('Task listing failed.');
+    const tasks = record(listed.result)['tasks'];
+    if (!Array.isArray(tasks)) throw new Error('Expected listed tasks.');
+    const taskId = record(tasks[0])['id'];
+    if (typeof taskId !== 'string') throw new Error('Expected a task ID.');
+
+    const pending = deferred<{ terminate: ReturnType<typeof vi.fn> }>();
+    const terminate = vi.fn();
+    vscodeMock.executeTask.mockReturnValueOnce(pending.promise);
+    const result = call(service, 'run_task', { taskId });
+    await vi.waitFor(() => expect(vscodeMock.executeTask).toHaveBeenCalledOnce());
+    service.dispose();
+    pending.resolve({ terminate });
+
+    await expect(result).resolves.toMatchObject({ outcome: 'toolError' });
+    expect(terminate).toHaveBeenCalledOnce();
+  });
+
   it('stops a debug session reported after revocation while startup is pending', async () => {
     const grants = new CapabilityGrantController();
     grants.grant('execution');
@@ -210,5 +234,113 @@ describe('execution revocation during VS Code startup', () => {
     });
     expect(vscodeMock.stopDebugging).toHaveBeenCalledOnce();
     expect(vscodeMock.stopDebugging).toHaveBeenCalledWith(session);
+  });
+
+  it('rechecks revocation while waiting for the debug-session event', async () => {
+    const grants = new CapabilityGrantController();
+    grants.grant('execution');
+    const service = createService(grants);
+    const state = await call(service, 'get_debug_state', {});
+    if (state.outcome !== 'success') throw new Error('Debug state failed.');
+    const configurations = record(state.result)['configurations'];
+    if (!Array.isArray(configurations))
+      throw new Error('Expected debug configurations.');
+    const workspaceFolderId = record(configurations[0])['workspaceFolderId'];
+    if (typeof workspaceFolderId !== 'string')
+      throw new Error('Expected a workspace folder ID.');
+
+    const pending = deferred<boolean>();
+    vscodeMock.startDebugging.mockReturnValueOnce(pending.promise);
+    const result = call(service, 'start_debugging', {
+      workspaceFolderId,
+      configurationName: 'Launch app',
+    });
+    await vi.waitFor(() => expect(vscodeMock.startDebugging).toHaveBeenCalledOnce());
+    pending.resolve(true);
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    grants.revoke('execution');
+    service.handleCapabilityRevoked('execution');
+    const session = {
+      id: 'observed-after-revocation',
+      name: 'Launch app',
+      type: 'node',
+      workspaceFolder: vscodeMock.folder,
+    };
+    vscodeMock.debugStartListeners[0]?.(session);
+
+    await expect(result).resolves.toMatchObject({
+      outcome: 'toolError',
+      error: { code: 'EXECUTION_GRANT_CHANGED' },
+    });
+    expect(vscodeMock.stopDebugging).toHaveBeenCalledWith(session);
+  });
+
+  it('stops a late debug session after service disposal', async () => {
+    const grants = new CapabilityGrantController();
+    grants.grant('execution');
+    const service = createService(grants);
+    const state = await call(service, 'get_debug_state', {});
+    if (state.outcome !== 'success') throw new Error('Debug state failed.');
+    const configurations = record(state.result)['configurations'];
+    if (!Array.isArray(configurations))
+      throw new Error('Expected debug configurations.');
+    const workspaceFolderId = record(configurations[0])['workspaceFolderId'];
+    if (typeof workspaceFolderId !== 'string')
+      throw new Error('Expected a workspace folder ID.');
+
+    const pending = deferred<boolean>();
+    vscodeMock.startDebugging.mockReturnValueOnce(pending.promise);
+    const result = call(service, 'start_debugging', {
+      workspaceFolderId,
+      configurationName: 'Launch app',
+    });
+    await vi.waitFor(() => expect(vscodeMock.startDebugging).toHaveBeenCalledOnce());
+    service.dispose();
+    const session = {
+      id: 'observed-after-disposal',
+      name: 'Launch app',
+      type: 'node',
+      workspaceFolder: vscodeMock.folder,
+    };
+    vscodeMock.debugStartListeners[0]?.(session);
+    pending.resolve(true);
+
+    await expect(result).resolves.toMatchObject({ outcome: 'toolError' });
+    expect(vscodeMock.stopDebugging).toHaveBeenCalledWith(session);
+  });
+
+  it('stops a session that arrives after the observation deadline', async () => {
+    const grants = new CapabilityGrantController();
+    grants.grant('execution');
+    const service = createService(grants);
+    const state = await call(service, 'get_debug_state', {});
+    if (state.outcome !== 'success') throw new Error('Debug state failed.');
+    const configurations = record(state.result)['configurations'];
+    if (!Array.isArray(configurations))
+      throw new Error('Expected debug configurations.');
+    const workspaceFolderId = record(configurations[0])['workspaceFolderId'];
+    if (typeof workspaceFolderId !== 'string')
+      throw new Error('Expected a workspace folder ID.');
+
+    vscodeMock.startDebugging.mockResolvedValueOnce(true);
+    await expect(
+      call(service, 'start_debugging', {
+        workspaceFolderId,
+        configurationName: 'Launch app',
+      }),
+    ).resolves.toMatchObject({
+      outcome: 'toolError',
+      error: { code: 'DEBUG_CONFIGURATION_NOT_FOUND' },
+    });
+    const session = {
+      id: 'observed-after-deadline',
+      name: 'Launch app',
+      type: 'node',
+      workspaceFolder: vscodeMock.folder,
+    };
+    vscodeMock.debugStartListeners[0]?.(session);
+
+    expect(vscodeMock.stopDebugging).toHaveBeenCalledWith(session);
+    service.dispose();
   });
 });

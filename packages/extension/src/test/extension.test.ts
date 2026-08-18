@@ -21,7 +21,7 @@ suite('vscode-mcp extension', () => {
   test('is installed in the extension development host', () => {
     const extension = vscode.extensions.getExtension('vscode-mcp.vscode-mcp');
     assert.ok(extension);
-    assert.equal(extension.packageJSON.version, '1.1.0');
+    assert.equal(extension.packageJSON.version, '1.1.1');
   });
 
   test('registers status and client lifecycle commands', async () => {
@@ -1813,7 +1813,7 @@ async function startMcpClient(workspacePath: string): Promise<JsonLineMcpClient>
   assert.equal(recordProperty(initialize, 'protocolVersion'), '2025-11-25');
   const serverInfo = requiredRecord(initialize, 'serverInfo');
   assert.equal(serverInfo['name'], 'vscode-mcp');
-  assert.equal(serverInfo['version'], '1.1.0');
+  assert.equal(serverInfo['version'], '1.1.1');
   client.notify('notifications/initialized', {});
   return client;
 }

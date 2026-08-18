@@ -5,7 +5,7 @@ extension. It is not a background service and does not open a network listener. 
 client starts `cli.mjs` with Node.js and communicates with it over standard input and
 standard output.
 
-Use the extension and server from the same `1.1.0` GitHub Release. A component or
+Use the extension and server from the same `1.1.1` GitHub Release. A component or
 contract mismatch fails closed.
 
 ## Run from an MCP client

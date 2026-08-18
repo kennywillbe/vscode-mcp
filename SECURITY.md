@@ -2,8 +2,13 @@
 
 ## Supported versions
 
-`vscode-mcp` has not published a release yet. Security fixes will initially be made on
-the default branch and included in the next GitHub release artifact.
+| Version | Supported |
+| ------- | --------- |
+| 1.1.1   | Yes       |
+| <=1.1.0 | No        |
+
+Security fixes are made on the default branch and included in coordinated, checksummed
+GitHub release artifacts. Extension and server versions must match.
 
 ## Reporting a vulnerability
 

@@ -93,7 +93,7 @@ async function packageRelease() {
       ['docs/installation.md', 'INSTALLATION.md'],
       ['docs/agent-usage-guide.md', 'AGENT_USAGE.md'],
       ['docs/tool-contract-v1.0.md', 'TOOL_CONTRACT.md'],
-      ['docs/release-notes-1.1.0.md', 'RELEASE_NOTES.md'],
+      ['docs/release-notes-1.1.1.md', 'RELEASE_NOTES.md'],
       ['PRIVACY.md', 'PRIVACY.md'],
       ['SECURITY.md', 'SECURITY.md'],
       ['SUPPORT.md', 'SUPPORT.md'],

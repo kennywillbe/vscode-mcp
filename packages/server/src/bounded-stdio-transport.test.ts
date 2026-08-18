@@ -39,6 +39,26 @@ describe('BoundedStdioServerTransport', () => {
     await transport.close();
   });
 
+  it('accepts a bounded message fragmented into one-byte chunks', async () => {
+    const message = request(1, 'x'.repeat(512));
+    const bytes = serialized(message);
+    const input = new PassThrough();
+    const transport = new BoundedStdioServerTransport(
+      input,
+      new PassThrough(),
+      bytes.length - 1,
+    );
+    const onMessage = vi.fn();
+    transport.onmessage = onMessage;
+    await transport.start();
+
+    for (const byte of bytes) input.write(Buffer.from([byte]));
+
+    expect(onMessage).toHaveBeenCalledOnce();
+    expect(onMessage).toHaveBeenCalledWith(message);
+    await transport.close();
+  });
+
   it('accepts the exact byte boundary and rejects one byte over before parsing', async () => {
     const exactMessage = request(1, 'x');
     const baseBytes = Buffer.byteLength(JSON.stringify(exactMessage), 'utf8');

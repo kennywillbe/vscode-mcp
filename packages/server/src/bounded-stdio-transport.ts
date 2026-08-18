@@ -35,7 +35,8 @@ export class BoundedStdioServerTransport implements Transport {
   public onerror?: (error: Error) => void;
   public onmessage?: <Message extends JSONRPCMessage>(message: Message) => void;
 
-  private pending = Buffer.alloc(0);
+  private readonly pending: Buffer;
+  private pendingLength = 0;
   private started = false;
   private closed = false;
 
@@ -47,6 +48,9 @@ export class BoundedStdioServerTransport implements Transport {
     if (!Number.isSafeInteger(maximumInboundBytes) || maximumInboundBytes <= 0) {
       throw new RangeError('The MCP inbound byte limit must be a positive integer.');
     }
+    // A fixed-capacity buffer keeps fragmented input linear: each accepted byte is
+    // copied once instead of repeatedly concatenating the whole partial message.
+    this.pending = Buffer.allocUnsafe(maximumInboundBytes);
   }
 
   public async start(): Promise<void> {
@@ -123,22 +127,20 @@ export class BoundedStdioServerTransport implements Transport {
   };
 
   private append(segment: Buffer): void {
-    if (this.pending.length + segment.length > this.maximumInboundBytes) {
+    if (this.pendingLength + segment.length > this.maximumInboundBytes) {
       this.fail(new BoundedStdioTransportError('MESSAGE_TOO_LARGE'));
       return;
     }
     if (segment.length === 0) {
       return;
     }
-    this.pending =
-      this.pending.length === 0
-        ? Buffer.from(segment)
-        : Buffer.concat([this.pending, segment], this.pending.length + segment.length);
+    segment.copy(this.pending, this.pendingLength);
+    this.pendingLength += segment.length;
   }
 
   private processPendingLine(): void {
-    let body = this.pending;
-    this.pending = Buffer.alloc(0);
+    let body = this.pending.subarray(0, this.pendingLength);
+    this.pendingLength = 0;
     if (body.at(-1) === CARRIAGE_RETURN) {
       body = body.subarray(0, -1);
     }
@@ -172,7 +174,7 @@ export class BoundedStdioServerTransport implements Transport {
     if (this.input.listenerCount('data') === 0) {
       this.input.pause();
     }
-    this.pending = Buffer.alloc(0);
+    this.pendingLength = 0;
     this.onclose?.();
   }
 }

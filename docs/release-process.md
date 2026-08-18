@@ -1,4 +1,4 @@
-# Local 1.0 release-candidate process
+# Local 1.1.1 release-candidate process
 
 This process creates the exact files for a coordinated GitHub Release and supplies the
 unchanged VSIX for manual Marketplace upload. It does not create a repository, tag,
@@ -11,7 +11,7 @@ Use a clean reviewed source snapshot with Node.js 22 and the pnpm version pinned
 `package.json`. Before packaging, confirm the accepted contracts, security evidence,
 static checks, Extension Host tests, and packaged-pair tests are current. The script
 enforces the mechanical version gate: the root, extension, server, and protocol package
-manifests must all be exactly `1.1.0`. It exits before building or writing artifacts if
+manifests must all be exactly `1.1.1`. It exits before building or writing artifacts if
 any version differs.
 
 Install and validate the exact locked dependency graph:
@@ -38,7 +38,7 @@ pnpm package:release
 
 The command performs these operations in order:
 
-1. Verifies that every workspace package is version `1.1.0`.
+1. Verifies that every workspace package is version `1.1.1`.
 2. Removes stale bundle outputs, then builds the server and extension production
    bundles.
 3. Reads the exact extension and server production dependency graph from pnpm.
@@ -50,17 +50,17 @@ The command performs these operations in order:
    media types, and verifies the SBOM component/dependency-reference coverage before
    accepting the candidate.
 
-On success, all candidate files are in `artifacts/release-1.1.0/`. A failed run removes
+On success, all candidate files are in `artifacts/release-1.1.1/`. A failed run removes
 its temporary staging directory. A successful rerun replaces only that versioned release
 directory; unrelated files in `artifacts/` are preserved.
 
 ## Candidate contents
 
-- `vscode-mcp-extension-1.1.0.vsix`: sideloadable VS Code Desktop extension containing
+- `vscode-mcp-extension-1.1.1.vsix`: sideloadable VS Code Desktop extension containing
   the exact SHA-256-manifested server used by the explicit client setup command.
-- `vscode-mcp-server-1.1.0.tar.gz`: platform-neutral bundled Node.js CLI under the
+- `vscode-mcp-server-1.1.1.tar.gz`: platform-neutral bundled Node.js CLI under the
   `vscode-mcp-server/` archive root.
-- `vscode-mcp-1.1.0.cdx.json`: CycloneDX 1.5 production dependency graph.
+- `vscode-mcp-1.1.1.cdx.json`: CycloneDX 1.5 production dependency graph.
 - `release-manifest.json`: file roles, compatibility bounds, byte sizes, and SHA-256
   digests for all candidate payloads.
 - `SHA256SUMS`: digests for every file in the candidate directory except itself.
@@ -92,7 +92,7 @@ the tracked file, review that change and rebuild the candidate from the reviewed
 Do not hand-edit the generated file.
 
 `verifyReleaseDirectory` opens both executable archives after checksum validation. It
-requires the exact safe VSIX/server file sets, embedded 1.1.0 identities and engine
+requires the exact safe VSIX/server file sets, embedded 1.1.1 identities and engine
 ranges, fixed tar ownership/modes/timestamps, an executable Node shebang, and production
 bundles without source maps or source-tree paths. Checksummed but malformed placeholder
 archives are rejected.

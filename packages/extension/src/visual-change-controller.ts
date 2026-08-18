@@ -5,6 +5,10 @@ import {
   type ProjectedVisualTextChange,
   type VisualTextChangeKind,
 } from './visual-change-model.js';
+import {
+  documentUtf16Length,
+  readDocumentTextWithinLimit,
+} from './bounded-document-text.js';
 
 const MAX_TRACKED_FILES = 200;
 const MAX_TRACKED_CHANGES = 4_096;
@@ -43,7 +47,7 @@ interface StoredFileChange {
 interface PreparedDocumentChange {
   readonly uri: vscode.Uri;
   readonly versionBefore: number;
-  readonly textBefore: string;
+  readonly textBefore?: string;
   readonly changes: readonly ProjectedVisualTextChange[];
 }
 
@@ -180,13 +184,22 @@ export class VisualChangeController
       documents.map((document) => [document.uri.toString(), document] as const),
     );
     const prepared: PreparedDocumentChange[] = [];
+    let preparedSnapshotBytes = 0;
     for (const [uri, edits] of edit.entries()) {
       const document = byUri.get(uri.toString());
       if (document === undefined || edits.length === 0) continue;
+      const availableSnapshotBytes = Math.min(
+        MAX_SNAPSHOT_BYTES,
+        MAX_TOTAL_SNAPSHOT_BYTES - this.snapshotBytes() - preparedSnapshotBytes,
+      );
+      const textBefore = readDocumentTextWithinLimit(document, availableSnapshotBytes);
+      if (textBefore !== undefined) {
+        preparedSnapshotBytes += Buffer.byteLength(textBefore, 'utf8');
+      }
       prepared.push({
         uri,
         versionBefore: document.version,
-        textBefore: document.getText(),
+        ...(textBefore === undefined ? {} : { textBefore }),
         changes: projectVisualTextChanges(
           edits.map((textEdit) => ({
             startOffset: document.offsetAt(textEdit.range.start),
@@ -219,7 +232,7 @@ export class VisualChangeController
         (candidate) => candidate.uri.toString() === item.uri.toString(),
       );
       if (document === undefined) continue;
-      const maximum = document.getText().length;
+      const maximum = documentUtf16Length(document);
       const changes = item.changes.map((change) => {
         const start = document.positionAt(Math.min(change.startOffset, maximum));
         const end = document.positionAt(Math.min(change.endOffset, maximum));
@@ -230,7 +243,7 @@ export class VisualChangeController
         tool: prepared.tool,
         fileKind: 'text',
         changes,
-        beforeText: item.textBefore,
+        ...(item.textBefore === undefined ? {} : { beforeText: item.textBefore }),
       });
     }
   }

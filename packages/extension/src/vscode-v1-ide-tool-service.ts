@@ -32,6 +32,10 @@ import {
   type WorkspaceIdentity,
 } from './workspace-identity.js';
 import { SingleUseHandleStore } from './single-use-handle-store.js';
+import {
+  saturatingAddProviderCounts,
+  snapshotBoundedProviderItems,
+} from './provider-output-bounds.js';
 import type {
   VisualChangeController,
   PreparedVisualChange,
@@ -75,6 +79,9 @@ interface TrackedDebug {
   state: 'running' | 'stopped';
   endedAt: string | null;
   session?: vscode.DebugSession;
+  awaitingStart: boolean;
+  stopRequested: boolean;
+  cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
 interface CodeActionPreview {
@@ -89,6 +96,57 @@ interface PreparedWorkspaceEdit {
   readonly versions: readonly number[];
 }
 
+const SAFE_PROVIDER_OBJECT_KEYS = [
+  'additionalTextEdits',
+  'background',
+  'character',
+  'code',
+  'commitCharacters',
+  'containerName',
+  'detail',
+  'disabledReason',
+  'documentation',
+  'end',
+  'endCharacter',
+  'endLine',
+  'filterText',
+  'group',
+  'insertText',
+  'isIncomplete',
+  'items',
+  'kind',
+  'label',
+  'language',
+  'line',
+  'location',
+  'message',
+  'name',
+  'parent',
+  'preselect',
+  'range',
+  'relatedInformation',
+  'roots',
+  'selectionRange',
+  'severity',
+  'sortText',
+  'source',
+  'start',
+  'startCharacter',
+  'startLine',
+  'subtypes',
+  'supertypes',
+  'tags',
+  'targetRange',
+  'targetSelectionRange',
+  'targetUri',
+  'textEdit',
+  'tooltip',
+  'uri',
+  'value',
+] as const;
+
+const DEBUG_START_TOMBSTONE_MS = 30_000;
+
 export class VsCodeV1IdeToolService implements vscode.Disposable {
   readonly #grants: CapabilityGrantController;
   readonly #isWorkspaceEnabled: ServiceOptions['isWorkspaceEnabled'];
@@ -102,11 +160,29 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     lifetimeMs: V1_IDE_TOOL_LIMITS.previewLifetimeMs,
     createToken: randomUUID,
   });
+  readonly #debugStartSubscription: vscode.Disposable;
+  #disposed = false;
 
   public constructor(options: ServiceOptions) {
     this.#grants = options.grants;
     this.#isWorkspaceEnabled = options.isWorkspaceEnabled;
     this.#visualChanges = options.visualChanges;
+    this.#debugStartSubscription = vscode.debug.onDidStartDebugSession((session) => {
+      for (const tracked of this.#debug.values()) {
+        if (
+          tracked.session === undefined &&
+          (tracked.state === 'running' || tracked.awaitingStart) &&
+          debugSessionMatches(tracked, session)
+        ) {
+          tracked.session = session;
+          tracked.type = session.type;
+          tracked.awaitingStart = false;
+          if (tracked.state === 'stopped') requestDebugStop(tracked);
+          break;
+        }
+      }
+      this.finishDisposedDebugTracking();
+    });
     this.#disposables.push(
       vscode.tasks.onDidEndTaskProcess((event) => {
         for (const tracked of this.#tasks.values()) {
@@ -115,19 +191,6 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
             tracked.exitCode = event.exitCode ?? null;
             tracked.endedAt = new Date().toISOString();
             clearTimeout(tracked.timer);
-          }
-        }
-      }),
-      vscode.debug.onDidStartDebugSession((session) => {
-        for (const tracked of this.#debug.values()) {
-          if (
-            tracked.session === undefined &&
-            tracked.state === 'running' &&
-            debugSessionMatches(tracked, session)
-          ) {
-            tracked.session = session;
-            tracked.type = session.type;
-            break;
           }
         }
       }),
@@ -143,19 +206,23 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
   }
 
   public dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
     for (const disposable of this.#disposables) disposable.dispose();
     for (const tracked of this.#tasks.values()) {
       clearTimeout(tracked.timer);
       tracked.execution.terminate();
     }
-    for (const tracked of this.#debug.values()) {
-      if (tracked.session !== undefined)
-        void vscode.debug.stopDebugging(tracked.session);
+    for (const [id, tracked] of this.#debug) {
+      tracked.state = 'stopped';
+      tracked.endedAt = new Date().toISOString();
+      requestDebugStop(tracked);
+      if (tracked.session === undefined) this.scheduleDebugTombstone(id, tracked);
     }
     this.#tasks.clear();
-    this.#debug.clear();
     this.#previews.clear();
     this.#taskIds.clear();
+    this.finishDisposedDebugTracking();
   }
 
   public handleCapabilityRevoked(capability: 'write' | 'execution'): void {
@@ -172,12 +239,30 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       clearTimeout(tracked.timer);
     }
     for (const tracked of this.#debug.values()) {
-      if (tracked.state === 'running' && tracked.session !== undefined) {
-        void vscode.debug.stopDebugging(tracked.session);
-      }
+      if (tracked.state === 'running') requestDebugStop(tracked);
       tracked.state = 'stopped';
       tracked.endedAt = new Date().toISOString();
     }
+  }
+
+  private finishDisposedDebugTracking(): void {
+    if (!this.#disposed) return;
+    if ([...this.#debug.values()].some((tracked) => tracked.awaitingStart)) return;
+    this.#debugStartSubscription.dispose();
+    for (const tracked of this.#debug.values()) {
+      if (tracked.cleanupTimer !== undefined) clearTimeout(tracked.cleanupTimer);
+    }
+    this.#debug.clear();
+  }
+
+  private scheduleDebugTombstone(id: string, tracked: TrackedDebug): void {
+    if (tracked.cleanupTimer !== undefined) return;
+    tracked.cleanupTimer = setTimeout(() => {
+      tracked.awaitingStart = false;
+      if (tracked.session === undefined) this.#debug.delete(id);
+      this.finishDisposedDebugTracking();
+    }, DEBUG_START_TOMBSTONE_MS);
+    tracked.cleanupTimer.unref();
   }
 
   public async callTool(
@@ -421,11 +506,12 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
         invocation.arguments.limit ?? V1_IDE_TOOL_LIMITS.completions,
         V1_IDE_TOOL_LIMITS.completions,
       );
+      const bounded = snapshotBoundedProviderItems(value.items, limit);
       selectedValue = {
         isIncomplete: value.isIncomplete,
-        items: value.items.slice(0, limit),
+        items: bounded.items,
       };
-      preOmitted = Math.max(0, value.items.length - limit);
+      preOmitted = bounded.omittedCount;
     } else if (
       invocation.tool === 'get_type_hierarchy' &&
       typeof value === 'object' &&
@@ -438,23 +524,30 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       const roots = Array.isArray(value.roots) ? value.roots : [];
       const supertypes = Array.isArray(value.supertypes) ? value.supertypes : [];
       const subtypes = Array.isArray(value.subtypes) ? value.subtypes : [];
+      const boundedRoots = snapshotBoundedProviderItems(roots, limit);
+      const boundedSupertypes = snapshotBoundedProviderItems(supertypes, limit);
+      const boundedSubtypes = snapshotBoundedProviderItems(subtypes, limit);
       selectedValue = {
-        roots: roots.slice(0, limit),
-        supertypes: supertypes.slice(0, limit),
-        subtypes: subtypes.slice(0, limit),
+        roots: boundedRoots.items,
+        supertypes: boundedSupertypes.items,
+        subtypes: boundedSubtypes.items,
       };
-      preOmitted =
-        Math.max(0, roots.length - limit) +
-        Math.max(0, supertypes.length - limit) +
-        Math.max(0, subtypes.length - limit);
+      preOmitted = saturatingAddProviderCounts(
+        boundedRoots.omittedCount,
+        saturatingAddProviderCounts(
+          boundedSupertypes.omittedCount,
+          boundedSubtypes.omittedCount,
+        ),
+      );
     } else if (Array.isArray(value)) {
       const requestedLimit =
         'limit' in invocation.arguments &&
         typeof invocation.arguments.limit === 'number'
           ? invocation.arguments.limit
           : V1_IDE_TOOL_LIMITS.providerItems;
-      selectedValue = value.slice(0, requestedLimit);
-      preOmitted = Math.max(0, value.length - requestedLimit);
+      const bounded = snapshotBoundedProviderItems(value, requestedLimit);
+      selectedValue = bounded.items;
+      preOmitted = bounded.omittedCount;
     }
     const normalized = normalizeProviderValue(selectedValue, access);
     const omittedCount = preOmitted + normalized.omittedCount;
@@ -474,36 +567,42 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     version: number,
   ): Promise<ToolDispatchResult> {
     const sourceActions = Array.isArray(value) ? value : [];
-    const actions = sourceActions.slice(0, V1_IDE_TOOL_LIMITS.codeActions);
+    const boundedActions = snapshotBoundedProviderItems(
+      sourceActions,
+      V1_IDE_TOOL_LIMITS.codeActions,
+    );
+    const actions = boundedActions.items;
     const result: Json[] = [];
     let previewBudget = 128 * 1024;
+    const previewGrant = this.#grants.capture('write');
     for (const candidate of actions) {
       if (!(candidate instanceof vscode.CodeAction)) continue;
       let previewToken: string | null = null;
       let preview: Json = null;
-      if (candidate.command === undefined && candidate.edit !== undefined) {
+      if (
+        previewGrant !== null &&
+        candidate.command === undefined &&
+        candidate.edit !== undefined
+      ) {
         const safeEdit = await prepareTextOnlyWorkspaceEdit(candidate.edit, access);
-        if (safeEdit !== null) {
-          const grant = this.#grants.capture('write');
-          if (grant !== null) {
-            previewToken = this.#previews.create(
-              {
-                edit: safeEdit.edit,
-                documents: safeEdit.documents,
-                versions: safeEdit.versions,
-              },
-              grant.generation,
-              access.identity.fingerprint,
+        if (safeEdit !== null && this.#grants.isCurrent(previewGrant)) {
+          previewToken = this.#previews.create(
+            {
+              edit: safeEdit.edit,
+              documents: safeEdit.documents,
+              versions: safeEdit.versions,
+            },
+            previewGrant.generation,
+            access.identity.fingerprint,
+          );
+          if (previewToken !== null) {
+            const summarized = summarizeWorkspaceEdit(
+              safeEdit.edit,
+              access,
+              previewBudget,
             );
-            if (previewToken !== null) {
-              const summarized = summarizeWorkspaceEdit(
-                safeEdit.edit,
-                access,
-                previewBudget,
-              );
-              preview = summarized.value;
-              previewBudget -= summarized.usedBytes;
-            }
+            preview = summarized.value;
+            previewBudget -= summarized.usedBytes;
           }
         }
       }
@@ -519,8 +618,8 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     }
     return {
       result: { actions: result },
-      truncated: sourceActions.length > actions.length,
-      omittedCount: Math.max(0, sourceActions.length - actions.length),
+      truncated: boundedActions.omittedCount > 0,
+      omittedCount: boundedActions.omittedCount,
     };
   }
 
@@ -852,7 +951,19 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
             range(args.range),
             options,
           );
-    const requested = edits ?? [];
+    const boundedEdits = snapshotBoundedProviderItems(
+      edits ?? [],
+      V1_IDE_TOOL_LIMITS.editsPerDocument + 1,
+    );
+    if (
+      boundedEdits.omittedCount > 0 ||
+      boundedEdits.items.length > V1_IDE_TOOL_LIMITS.editsPerDocument
+    )
+      throw new IdeToolError(
+        'EDIT_LIMIT_REACHED',
+        'The formatting provider exceeded the edit limit.',
+      );
+    const requested = [...boundedEdits.items];
     validateEdits(
       document,
       requested.map((edit) => ({
@@ -1005,9 +1116,11 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
 
   private async listTasks(access: Access): Promise<ToolDispatchResult> {
     this.#taskIds.clear();
-    const candidates = (await vscode.tasks.fetchTasks()).filter((task) =>
-      taskInAccess(task, access),
+    const fetched = snapshotBoundedProviderItems(
+      await vscode.tasks.fetchTasks(),
+      V1_IDE_TOOL_LIMITS.listedTasks + 1,
     );
+    const candidates = fetched.items.filter((task) => taskInAccess(task, access));
     const tasks = candidates.slice(0, V1_IDE_TOOL_LIMITS.listedTasks);
     return {
       result: {
@@ -1026,8 +1139,11 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
           };
         }),
       },
-      truncated: candidates.length > tasks.length,
-      omittedCount: candidates.length - tasks.length,
+      truncated: fetched.omittedCount > 0 || candidates.length > tasks.length,
+      omittedCount: saturatingAddProviderCounts(
+        fetched.omittedCount,
+        candidates.length - tasks.length,
+      ),
     };
   }
 
@@ -1044,7 +1160,11 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     const fingerprint = this.#taskIds.get(taskId);
     if (fingerprint === undefined)
       throw new IdeToolError('TASK_NOT_FOUND', 'The task ID is unknown.');
-    const matches = (await vscode.tasks.fetchTasks()).filter(
+    const fetched = snapshotBoundedProviderItems(
+      await vscode.tasks.fetchTasks(),
+      V1_IDE_TOOL_LIMITS.listedTasks + 1,
+    );
+    const matches = fetched.items.filter(
       (task) => taskInAccess(task, access) && taskFingerprint(task) === fingerprint,
     );
     if (matches.length === 0)
@@ -1056,6 +1176,10 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       );
     if (!this.#grants.isCurrent(grant)) throw grantChanged('execution');
     const execution = await vscode.tasks.executeTask(matches[0]!);
+    if (!this.#grants.isCurrent(grant) || this.#disposed) {
+      execution.terminate();
+      throw grantChanged('execution');
+    }
     const executionId = randomUUID();
     const timer = setTimeout(() => {
       execution.terminate();
@@ -1177,10 +1301,19 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
     access: Access,
   ): Promise<Json> {
     const grant = requiredGrant(this.#grants, 'execution');
+    for (const [trackedId, tracked] of this.#debug) {
+      if (tracked.state === 'stopped' && !tracked.awaitingStart) {
+        if (tracked.cleanupTimer !== undefined) clearTimeout(tracked.cleanupTimer);
+        this.#debug.delete(trackedId);
+      }
+    }
     const activeDebug = [...this.#debug.values()].filter(
       (session) => session.state === 'running',
     ).length;
-    if (activeDebug >= V1_IDE_TOOL_LIMITS.trackedDebugSessions)
+    if (
+      activeDebug >= V1_IDE_TOOL_LIMITS.trackedDebugSessions ||
+      this.#debug.size >= V1_IDE_TOOL_LIMITS.trackedDebugSessions
+    )
       throw new IdeToolError(
         'TASK_LIMIT_REACHED',
         'The tracked debug-session limit was reached.',
@@ -1212,12 +1345,15 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       startedAt: new Date().toISOString(),
       state: 'running',
       endedAt: null,
+      awaitingStart: true,
+      stopRequested: false,
     };
     this.#debug.set(id, tracked);
     const started = await vscode.debug.startDebugging(folder, args.configurationName, {
       noDebug: args.noDebug ?? false,
     });
     if (!started) {
+      tracked.awaitingStart = false;
       this.#debug.delete(id);
       throw new IdeToolError(
         'DEBUG_CONFIGURATION_NOT_FOUND',
@@ -1233,13 +1369,30 @@ export class VsCodeV1IdeToolService implements vscode.Disposable {
       tracked.session = active;
       tracked.name = active.name;
       tracked.type = active.type;
+      tracked.awaitingStart = false;
+    }
+    if (!this.#grants.isCurrent(grant) || this.#disposed) {
+      tracked.state = 'stopped';
+      tracked.endedAt = new Date().toISOString();
+      requestDebugStop(tracked);
+      if (tracked.session === undefined) this.scheduleDebugTombstone(id, tracked);
+      throw grantChanged('execution');
     }
     const deadline = Date.now() + 2_000;
     while (tracked.session === undefined && Date.now() < deadline) {
       await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 25));
     }
+    if (!this.#grants.isCurrent(grant) || this.#disposed) {
+      tracked.state = 'stopped';
+      tracked.endedAt = new Date().toISOString();
+      requestDebugStop(tracked);
+      if (tracked.session === undefined) this.scheduleDebugTombstone(id, tracked);
+      throw grantChanged('execution');
+    }
     if (tracked.session === undefined) {
-      this.#debug.delete(id);
+      tracked.state = 'stopped';
+      tracked.endedAt = new Date().toISOString();
+      this.scheduleDebugTombstone(id, tracked);
       throw new IdeToolError(
         'DEBUG_CONFIGURATION_NOT_FOUND',
         'VS Code started no observable session for the named configuration.',
@@ -1295,6 +1448,12 @@ function debugSessionMatches(
     (tracked.folderUri === session.workspaceFolder?.uri.toString() ||
       (session.workspaceFolder === undefined && tracked.allowUnscopedSession))
   );
+}
+
+function requestDebugStop(tracked: TrackedDebug): void {
+  if (tracked.session === undefined || tracked.stopRequested) return;
+  tracked.stopRequested = true;
+  void vscode.debug.stopDebugging(tracked.session);
 }
 
 function summarizeWorkspaceEdit(
@@ -1705,6 +1864,24 @@ function validateEdits(
       'EDIT_LIMIT_REACHED',
       'The per-document edit limit was exceeded.',
     );
+  let replacementBytes = 0;
+  for (const edit of edits) {
+    const editBytes = boundedUtf8ByteLength(
+      edit.newText,
+      V1_IDE_TOOL_LIMITS.replacementBytesPerEdit,
+    );
+    if (editBytes === null)
+      throw new IdeToolError(
+        'EDIT_LIMIT_REACHED',
+        'An edit exceeded the replacement byte limit.',
+      );
+    replacementBytes += editBytes;
+    if (replacementBytes > V1_IDE_TOOL_LIMITS.replacementBytesTotal)
+      throw new IdeToolError(
+        'EDIT_LIMIT_REACHED',
+        'The replacement byte limit was exceeded.',
+      );
+  }
   const spans = edits
     .map((edit) => {
       const requested = range(edit.range);
@@ -1734,10 +1911,21 @@ async function prepareTextOnlyWorkspaceEdit(
   const versions: number[] = [];
   let count = 0;
   let bytes = 0;
+  if (source.size > V1_IDE_TOOL_LIMITS.documentsPerWrite) return null;
   const entries = source.entries();
   if (source.size !== entries.length) return null;
   for (const [uri, edits] of entries) {
-    if (!uriInAccess(uri, access) || edits.length === 0) return null;
+    const boundedEdits = snapshotBoundedProviderItems(
+      edits,
+      V1_IDE_TOOL_LIMITS.editsPerDocument + 1,
+    );
+    if (
+      !uriInAccess(uri, access) ||
+      boundedEdits.items.length === 0 ||
+      boundedEdits.items.length > V1_IDE_TOOL_LIMITS.editsPerDocument ||
+      boundedEdits.omittedCount > 0
+    )
+      return null;
     let canonical: string;
     try {
       const stats = await lstat(uri.fsPath);
@@ -1748,21 +1936,31 @@ async function prepareTextOnlyWorkspaceEdit(
     }
     if (!pathInCanonicalAccess(canonical, access)) return null;
     const document = await vscode.workspace.openTextDocument(uri);
+    const selectedEdits = [...boundedEdits.items];
     validateEdits(
       document,
-      edits.map((edit) => ({ range: plainRange(edit.range), newText: edit.newText })),
+      selectedEdits.map((edit) => ({
+        range: plainRange(edit.range),
+        newText: edit.newText,
+      })),
     );
-    count += edits.length;
-    for (const edit of edits) bytes += Buffer.byteLength(edit.newText, 'utf8');
+    count += selectedEdits.length;
+    for (const edit of selectedEdits) {
+      const editBytes = boundedUtf8ByteLength(
+        edit.newText,
+        V1_IDE_TOOL_LIMITS.replacementBytesPerEdit,
+      );
+      if (editBytes === null) return null;
+      bytes += editBytes;
+    }
     if (
       count > V1_IDE_TOOL_LIMITS.editsTotal ||
-      edits.length > V1_IDE_TOOL_LIMITS.editsPerDocument ||
       bytes > V1_IDE_TOOL_LIMITS.replacementBytesTotal
     )
       return null;
     output.set(
       uri,
-      edits.map((edit) => new vscode.TextEdit(edit.range, edit.newText)),
+      selectedEdits.map((edit) => new vscode.TextEdit(edit.range, edit.newText)),
     );
     documents.push(document);
     versions.push(document.version);
@@ -1805,9 +2003,11 @@ function normalizeProviderValue(
     if (item instanceof vscode.Uri)
       return uriInAccess(item, access) ? workspaceUri(item, access) : null;
     if (item instanceof vscode.MarkdownString) {
+      const selected = boundedText(item.value, Math.min(16_384, remainingBytes));
+      if (selected.length < item.value.length) omittedCount += 1;
       return {
         value: consumeText(
-          item.value.replaceAll(/\]\(\s*command:[^)]+\)/giu, '](command omitted)'),
+          selected.replaceAll(/\]\(\s*command:[^)]+\)/giu, '](command omitted)'),
           16_384,
         ),
       };
@@ -1816,12 +2016,18 @@ function normalizeProviderValue(
       return { line: item.line, character: item.character };
     if (item instanceof vscode.Range) return plainRange(item);
     if (Array.isArray(item)) {
-      const selected = item.slice(0, V1_IDE_TOOL_LIMITS.providerItems);
-      omittedCount += item.length - selected.length;
+      const selected = snapshotBoundedProviderItems(
+        item,
+        V1_IDE_TOOL_LIMITS.providerItems,
+      );
+      omittedCount = saturatingAddProviderCounts(omittedCount, selected.omittedCount);
       const values: Json[] = [];
-      for (const entry of selected) {
+      for (const entry of selected.items) {
         if (remainingBytes < 16) {
-          omittedCount += selected.length - values.length;
+          omittedCount = saturatingAddProviderCounts(
+            omittedCount,
+            selected.items.length - values.length,
+          );
           break;
         }
         remainingBytes -= 16;
@@ -1833,16 +2039,20 @@ function normalizeProviderValue(
       if (seen.has(item)) return null;
       seen.add(item);
       const result: { [key: string]: Json } = {};
-      const keys = Object.keys(item).sort();
-      omittedCount += Math.max(0, keys.length - 32);
-      for (const key of keys.slice(0, 32)) {
+      const record = item as Record<string, unknown>;
+      for (const key of SAFE_PROVIDER_OBJECT_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+        const raw = record[key];
+        if (raw instanceof vscode.Uri && !uriInAccess(raw, access)) {
+          omittedCount += 1;
+          return null;
+        }
         if (remainingBytes < Buffer.byteLength(key, 'utf8') + 16) {
           omittedCount += 1;
           continue;
         }
         remainingBytes -= Buffer.byteLength(key, 'utf8') + 16;
-        if (['command', 'arguments', 'data', 'edit'].includes(key)) continue;
-        const normalized = normalize((item as Record<string, unknown>)[key], depth + 1);
+        const normalized = normalize(raw, depth + 1);
         if (normalized !== null) result[key] = normalized;
       }
       return result;
@@ -1931,10 +2141,10 @@ function taskFingerprint(task: vscode.Task): string {
   return createHash('sha256')
     .update(
       JSON.stringify([
-        task.name,
-        task.source,
-        task.definition.type,
-        scope,
+        boundedText(task.name, 512),
+        boundedText(task.source, 512),
+        boundedText(task.definition.type, 256),
+        boundedText(scope, 1_024),
         task.group?.id ?? null,
         safeTaskRunner(task),
       ]),
@@ -1960,7 +2170,7 @@ function safeTaskRunner(task: vscode.Task): SafeTaskRunner | null {
 }
 
 function allowlistedTaskRunner(command: string): SafeTaskRunner | null {
-  const executable = command.split(/[\\/]/).at(-1)?.toLowerCase();
+  const executable = boundedText(command, 1_024).split(/[\\/]/).at(-1)?.toLowerCase();
   switch (executable) {
     case 'npm':
     case 'yarn':
@@ -1992,16 +2202,25 @@ function isNodeCode(error: unknown, code: string): boolean {
 }
 
 function boundedText(value: string, maximumBytes: number): string {
-  if (Buffer.byteLength(value, 'utf8') <= maximumBytes) return value;
+  if (maximumBytes <= 0) return '';
+  const boundedPrefix = value.slice(0, maximumBytes);
+  if (Buffer.byteLength(boundedPrefix, 'utf8') <= maximumBytes) {
+    return boundedPrefix;
+  }
   let lower = 0;
-  let upper = value.length;
+  let upper = boundedPrefix.length;
   while (lower < upper) {
     const candidate = Math.ceil((lower + upper) / 2);
-    if (Buffer.byteLength(value.slice(0, candidate), 'utf8') <= maximumBytes) {
+    if (Buffer.byteLength(boundedPrefix.slice(0, candidate), 'utf8') <= maximumBytes) {
       lower = candidate;
     } else {
       upper = candidate - 1;
     }
   }
-  return value.slice(0, lower);
+  return boundedPrefix.slice(0, lower);
+}
+
+function boundedUtf8ByteLength(value: string, maximumBytes: number): number | null {
+  const selected = boundedText(value, maximumBytes);
+  return selected.length === value.length ? Buffer.byteLength(selected, 'utf8') : null;
 }

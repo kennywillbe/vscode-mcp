@@ -10,6 +10,26 @@ This report is the full-surface addendum to the inherited transport/read accepta
 report. Evidence names below are repeatable repository commands or test files. Windows
 is outside the 1.0 matrix and is covered by `docs/windows-support-plan.md`.
 
+## 1.1.1 security patch evidence
+
+- `bounded-document-text.unit.test.ts` proves oversized live documents are rejected
+  before `getText()` materialization, and separately enforces the UTF-8 byte ceiling.
+- `vscode-v1-execution-revocation.unit.test.ts` proves task handles returned after
+  revocation are terminated and debug sessions observed during a revoked start are
+  stopped.
+- Provider-owned language results, edits, and task arrays are snapshotted through raw
+  numeric limits before projection, validation, or fingerprinting; code-action edit
+  previews additionally require a current write grant.
+- `bounded-stdio-transport.test.ts` exercises a complete bounded MCP message delivered
+  one byte at a time against the fixed-capacity accumulation path.
+- `pnpm audit` reports no known vulnerabilities for the exact 1.1.1 lockfile.
+- `pnpm check` passes 50 files / 466 unit and contract tests, and `pnpm build` passes
+  all workspace package builds.
+- Source Extension Host tests pass 13 scenarios on stable VS Code; exact packaged-pair
+  tests pass the same 13 scenarios on both VS Code 1.101.0 and stable.
+- Two consecutive `pnpm package:release` runs produce byte-identical `SHA256SUMS`, and
+  the packaged artifact verifier accepts the exact release directory.
+
 ## Executed gates
 
 - `pnpm check`: format, ESLint, all package typechecks, 47 files / 442 unit and

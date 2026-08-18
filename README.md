@@ -6,9 +6,11 @@ intelligence, version-checked edits and file operations, configured tasks, and n
 run/debug configurations without adding a generic shell, terminal, Git controller, or
 network service.
 
-> [!IMPORTANT] Version 1.0.1 is available from GitHub Releases and the VS Code
-> Marketplace. Version 1.1.0 adds agent-oriented change review and workflow fidelity.
-> Windows is deferred and fails closed before listener or registry publication.
+> [!IMPORTANT] Version 1.1.1 is the current coordinated extension/server release. It
+> retains the 1.1 change-review workflow while closing snapshot-allocation and
+> execution-grant revocation races, bounding provider output earlier, and refreshing the
+> audited dependency graph. Windows is deferred and fails closed before listener or
+> registry publication.
 
 ## Quick install
 
@@ -176,7 +178,7 @@ Create a local, unpublished development VSIX with:
 pnpm package:vsix
 ```
 
-After every release gate is complete and all package versions are `1.1.0`, create the
+After every release gate is complete and all package versions are `1.1.1`, create the
 complete local candidate with:
 
 ```sh
@@ -185,7 +187,7 @@ pnpm package:release
 
 That command writes a version-matched VSIX and server archive, a CycloneDX SBOM,
 licenses and third-party notices, a release manifest, and SHA-256 checksums under
-`artifacts/release-1.1.0/`. It has no upload or publication path. See the
+`artifacts/release-1.1.1/`. It has no upload or publication path. See the
 [release-candidate process](./docs/release-process.md).
 
 Test the exact packaged VSIX and extracted server rather than source-development bundles
@@ -208,10 +210,9 @@ Snap, and Flatpak are deferred and fail closed.
 
 ## Distribution status
 
-Version 1.0.1 is the current published GitHub and Marketplace release. Version 1.1.0 is
-packaged under `artifacts/release-1.1.0/` before publication. The exact verified 1.1.0
-VSIX from its GitHub Release is then uploaded manually to the VS Code Marketplace
-without rebuilding. Open VSX, npm, JSR, Yarn, and Bun remain out of scope.
+Version 1.1.1 is the current coordinated GitHub release. Its exact verified VSIX is the
+only artifact eligible for manual upload to the VS Code Marketplace; it must never be
+rebuilt between channels. Open VSX, npm, JSR, Yarn, and Bun remain out of scope.
 
 Installation, upgrade, downgrade, and removal are documented in
 [docs/installation.md](./docs/installation.md). Candidate construction and verification

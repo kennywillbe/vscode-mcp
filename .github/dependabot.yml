@@ -24,3 +24,9 @@ updates:
       time: '05:30'
       timezone: Europe/Istanbul
     open-pull-requests-limit: 3
+    groups:
+      # init and analyze must run the same CodeQL version, so they have to be
+      # bumped in a single pull request.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action*'

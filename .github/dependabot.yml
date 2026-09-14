@@ -10,6 +10,11 @@ updates:
       timezone: Europe/Istanbul
     versioning-strategy: increase-if-necessary
     open-pull-requests-limit: 5
+    ignore:
+      # @types/node must track the Node major in engines.node (^22.13.0).
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
     groups:
       development-tooling:
         dependency-type: development
@@ -24,3 +29,9 @@ updates:
       time: '05:30'
       timezone: Europe/Istanbul
     open-pull-requests-limit: 3
+    groups:
+      # init and analyze must run the same CodeQL version, so they have to be
+      # bumped in a single pull request.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action*'

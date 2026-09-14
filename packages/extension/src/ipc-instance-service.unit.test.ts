@@ -304,6 +304,7 @@ it('preserves the listener instance after two transient heartbeat failures', asy
   try {
     let renameAttempts = 0;
     let notifications = 0;
+    const published = deferred();
     const nodeFileSystem = NODE_RUNTIME_REGISTRY_DEPENDENCIES.fileSystem;
     const registryDependencies: RuntimeRegistryDependencies = {
       randomBytes: NODE_RUNTIME_REGISTRY_DEPENDENCIES.randomBytes,
@@ -315,6 +316,7 @@ it('preserves the listener instance after two transient heartbeat failures', asy
             throw new Error('Transient heartbeat publication failure.');
           }
           await nodeFileSystem.rename(source, destination);
+          if (renameAttempts === 4) published.resolve();
         },
       },
     };
@@ -326,7 +328,7 @@ it('preserves the listener instance after two transient heartbeat failures', asy
     });
 
     await vi.advanceTimersByTimeAsync(PROTOCOL_LIMITS.registryHeartbeatIntervalMs);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await published.promise;
 
     expect(renameAttempts).toBe(4);
     expect(notifications).toBe(0);

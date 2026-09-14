@@ -7,7 +7,7 @@ The list is generated from the exact pnpm production dependency graph used by th
 extension and server builds. License texts are copied from the installed packages.
 
 Dependency components: 95
-Dependency graph SHA-256: `b86ed4c161ad2050fb5a49ede09d88b79a6424c99d10e6092c321d7138c61205`
+Dependency graph SHA-256: `1ac66b62495745fdd00daf4794302de32edb6e738cfce1f9af4adb2fd08f71fe`
 
 ## @hono/node-server 2.1.1
 
@@ -1022,7 +1022,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## fast-uri 3.1.5
+## fast-uri 3.1.7
 
 - License: `BSD-3-Clause`
 - Included in: server
@@ -1373,7 +1373,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## hono 4.13.3
+## hono 4.13.7
 
 - License: `MIT`
 - Included in: server
@@ -2242,7 +2242,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --- END LICENSE ---
 
-## qs 6.15.3
+## qs 6.16.0
 
 - License: `BSD-3-Clause`
 - Included in: server

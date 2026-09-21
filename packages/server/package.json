@@ -27,6 +27,6 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@vscode-mcp/protocol": "workspace:*",
     "vscode-jsonrpc": "9.0.2",
-    "zod": "4.6.2"
+    "zod": "4.6.5"
   }
 }

@@ -74,7 +74,7 @@
     "watch": "tsc --noEmit -p tsconfig.json --watch"
   },
   "dependencies": {
-    "vscode-jsonrpc": "9.0.2",
-    "zod": "4.6.2"
+    "vscode-jsonrpc": "9.0.3",
+    "zod": "4.6.5"
   }
 }

@@ -7,9 +7,9 @@ The list is generated from the exact pnpm production dependency graph used by th
 extension and server builds. License texts are copied from the installed packages.
 
 Dependency components: 95
-Dependency graph SHA-256: `1ac66b62495745fdd00daf4794302de32edb6e738cfce1f9af4adb2fd08f71fe`
+Dependency graph SHA-256: `e134e26bf438bea52d89c30d4de661e68d3a9c69ef2072e110c257d25d4122cb`
 
-## @hono/node-server 2.1.1
+## @hono/node-server 2.1.5
 
 - License: `MIT`
 - Included in: server
@@ -41,7 +41,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## @modelcontextprotocol/sdk 1.30.0
+## @modelcontextprotocol/sdk 1.32.2
 
 - License: `MIT`
 - Included in: server
@@ -171,11 +171,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## body-parser 2.3.0
+## body-parser 2.4.0
 
 - License: `MIT`
 - Included in: server
-- Source: https://registry.npmjs.org/body-parser/-/body-parser-2.3.0.tgz
+- Source: https://registry.npmjs.org/body-parser/-/body-parser-2.4.0.tgz
 
 ### LICENSE
 
@@ -1022,7 +1022,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## fast-uri 3.1.7
+## fast-uri 3.1.9
 
 - License: `BSD-3-Clause`
 - Included in: server
@@ -1373,7 +1373,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## hono 4.13.7
+## hono 4.13.14
 
 - License: `MIT`
 - Included in: server
@@ -1496,7 +1496,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 --- END LICENSE ---
 
-## ip-address 10.5.0
+## ip-address 10.7.5
 
 - License: `MIT`
 - Included in: server
@@ -2209,11 +2209,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --- END LICENSE ---
 
-## proxy-addr 2.0.7
+## proxy-addr 2.0.8
 
 - License: `MIT`
 - Included in: server
-- Source: https://registry.npmjs.org/proxy-addr/-/proxy-addr-2.0.7.tgz
+- Source: https://registry.npmjs.org/proxy-addr/-/proxy-addr-2.0.8.tgz
 
 ### LICENSE
 
@@ -2242,7 +2242,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --- END LICENSE ---
 
-## qs 6.16.0
+## qs 6.17.1
 
 - License: `BSD-3-Clause`
 - Included in: server
@@ -2895,7 +2895,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --- END LICENSE ---
 
-## vscode-jsonrpc 9.0.1
+## vscode-jsonrpc 9.0.2
 
 - License: `MIT`
 - Included in: extension, server
@@ -2995,7 +2995,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 --- END LICENSE ---
 
-## zod 4.4.3
+## zod 4.6.7
 
 - License: `MIT`
 - Included in: extension, server
